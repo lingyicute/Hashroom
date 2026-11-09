@@ -2375,10 +2375,6 @@
       return {content: line, file: ''};
     }
 
-    function entryFileName(line) {
-      return splitChecksumLine(line).file;
-    }
-
     // 清单里有一行写明了当前文件的名字时，带有其他文件名的行不属于这个文件，不参与比对。
     function entriesForFile(entries, fileName) {
       if (!fileName || !entries.some(entry => entry.file === fileName)) return {entries, ignored: 0};
