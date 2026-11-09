@@ -3048,11 +3048,15 @@
     themeToggle.addEventListener('click', () => {
       setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
     });
-    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', event => {
+    const darkQuery = matchMedia('(prefers-color-scheme: dark)');
+    const onSchemeChange = event => {
       let saved = null;
       try {saved = localStorage.getItem('hashroom-theme');} catch (error) { }
       if (!saved) setTheme(event.matches ? 'dark' : 'light', false);
-    });
+    };
+    // 旧版 Safari 的 MediaQueryList 只有 addListener。
+    if (darkQuery.addEventListener) darkQuery.addEventListener('change', onSchemeChange);
+    else if (darkQuery.addListener) darkQuery.addListener(onSchemeChange);
     selfTest();
   </script>
 </body>
