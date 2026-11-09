@@ -2358,9 +2358,9 @@
     }
 
     // 从 sha256sum（“哈希  文件名”“哈希 *文件名”）和 BSD（“SHA256 (文件名) = 哈希”）的输出里取出文件名，
-    // 粘贴整份校验清单时才能只比对属于当前文件的那一行。
+    // 粘贴整份校验清单时才能只比对属于当前文件的那一行。以反斜杠开头的行（coreutils 转义过文件名）认不出文件名，照常参与比对。
     function entryFileName(line) {
-      const found = line.match(/^[A-Za-z][\w/-]*\s*\((.+)\)\s*=\s*\S/) || line.match(/^(?:\w+sum\s+)?\\?[0-9a-fA-F]{8,128}(?: [ *])(.+)$/);
+      const found = line.match(/^[A-Za-z][\w/-]*\s*\((.+)\)\s*=\s*\S/) || line.match(/^(?:\w+sum\s+)?[0-9a-fA-F]{8,128}(?: [ *])(.+)$/);
       return found ? found[1].trim().split(/[\\/]/).pop() : '';
     }
 
