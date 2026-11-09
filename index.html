@@ -2146,7 +2146,7 @@
         const found = line.match(/sha-?3-?(?:224|256|384|512)|sha-?512[/-]?(?:224|256)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/i);
         const algorithm = found ? canonicalAlgorithm(found[0]) : null;
         const expectedLength = algorithm ? ALGORITHMS.find(item => item.id === algorithm).bits / 4 : 0;
-        const hex = extractHex(line, expectedLength);
+        const hex = extractHex(found ? line.replace(found[0], ' ') : line, expectedLength);
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
           invalid = true;
           return;
