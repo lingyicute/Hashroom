@@ -1,0 +1,2806 @@
+<!-- 
+==========================================================================
+  Copyright 2026 lingyicute
+==========================================================================
+-->
+<!doctype html>
+<html lang="zh-CN" data-theme="light" data-accent="violet">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f7f5fa">
+  <title>Hashroom 文件摘要小助手 by lingyicute</title>
+  <script>
+    try {
+      const accents = ['violet', 'blue', 'teal', 'green', 'orange', 'rose'];
+      const savedTheme = localStorage.getItem('hashroom-theme');
+      const savedAccent = localStorage.getItem('hashroom-accent');
+      const colors = {
+        violet: ['#f7f5fa', '#141218'],
+        blue: ['#f5f7fc', '#10141a'],
+        teal: ['#f4f8f7', '#101615'],
+        green: ['#f5f8f4', '#111612'],
+        orange: ['#faf6f3', '#161310'],
+        rose: ['#faf5f7', '#161214']
+      };
+      const dark = savedTheme === 'dark' || (!savedTheme && matchMedia('(prefers-color-scheme: dark)').matches);
+      const accent = accents.includes(savedAccent) ? savedAccent : 'violet';
+      if (dark) document.documentElement.dataset.theme = 'dark';
+      document.documentElement.dataset.accent = accent;
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = colors[accent][dark ? 1 : 0];
+    } catch (error) {
+      // Storage can be blocked; the default theme still renders.
+    }
+  </script>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f7f5fa;
+      --surface: #fffefa;
+      --surface-low: #f1eef5;
+      --surface-high: #eae6ef;
+      --text: #211d25;
+      --muted: #686370;
+      --outline: #bdb7c5;
+      --outline-soft: #e2dee7;
+      --primary: #6750a4;
+      --on-primary: #ffffff;
+      --primary-container: #eaddff;
+      --on-primary-container: #25113f;
+      --error: #b3261e;
+      --error-container: #f9dedc;
+      --on-error-container: #410e0b;
+      --success: #1b7a3a;
+      --success-container: #d8f3e0;
+      --on-success-container: #0d3b1e;
+      --shadow: 0 12px 34px rgb(43 34 56 / 7%);
+      --swatch: #6750a4;
+    }
+
+    html[data-theme="dark"] {
+      color-scheme: dark;
+      --bg: #141218;
+      --surface: #201d24;
+      --surface-low: #1b181f;
+      --surface-high: #302b35;
+      --text: #e8e0eb;
+      --muted: #c9c2ce;
+      --outline: #514b57;
+      --outline-soft: #39343d;
+      --error: #ffb4ab;
+      --error-container: #601410;
+      --on-error-container: #ffdad6;
+      --success: #8ad7a2;
+      --success-container: #0f3d24;
+      --on-success-container: #c9f6d6;
+      --shadow: 0 14px 36px rgb(0 0 0 / 28%);
+    }
+
+    html[data-accent="violet"] {
+      --primary: #6750a4;
+      --on-primary: #ffffff;
+      --primary-container: #eaddff;
+      --on-primary-container: #25113f;
+      --bg: #f7f5fa;
+      --surface-low: #f1eef5;
+      --swatch: #6750a4;
+    }
+
+    html[data-theme="dark"][data-accent="violet"] {
+      --primary: #d0bcff;
+      --on-primary: #381e72;
+      --primary-container: #4e3a70;
+      --on-primary-container: #eadcff;
+      --bg: #141218;
+      --surface-low: #1b181f;
+    }
+
+    html[data-accent="blue"] {
+      --primary: #1a56c4;
+      --on-primary: #ffffff;
+      --primary-container: #d7e3ff;
+      --on-primary-container: #001a41;
+      --bg: #f5f7fc;
+      --surface-low: #eef2fa;
+      --swatch: #1a56c4;
+    }
+
+    html[data-theme="dark"][data-accent="blue"] {
+      --primary: #adc7ff;
+      --on-primary: #002e69;
+      --primary-container: #0f4aa8;
+      --on-primary-container: #d7e3ff;
+      --bg: #10141a;
+      --surface-low: #171d27;
+    }
+
+    html[data-accent="teal"] {
+      --primary: #0f6e66;
+      --on-primary: #ffffff;
+      --primary-container: #c8f4ee;
+      --on-primary-container: #042f2c;
+      --bg: #f4f8f7;
+      --surface-low: #eaf3f1;
+      --swatch: #0f6e66;
+    }
+
+    html[data-theme="dark"][data-accent="teal"] {
+      --primary: #8ee8dc;
+      --on-primary: #04332f;
+      --primary-container: #0d534c;
+      --on-primary-container: #c8f4ee;
+      --bg: #101615;
+      --surface-low: #17201e;
+    }
+
+    html[data-accent="green"] {
+      --primary: #1f7a3a;
+      --on-primary: #ffffff;
+      --primary-container: #d7efd4;
+      --on-primary-container: #0d2f12;
+      --bg: #f5f8f4;
+      --surface-low: #eaf2e8;
+      --swatch: #1f7a3a;
+    }
+
+    html[data-theme="dark"][data-accent="green"] {
+      --primary: #a6d8a4;
+      --on-primary: #0d3b14;
+      --primary-container: #1d5c28;
+      --on-primary-container: #d7efd4;
+      --bg: #111612;
+      --surface-low: #182018;
+    }
+
+    html[data-accent="orange"] {
+      --primary: #9a3412;
+      --on-primary: #ffffff;
+      --primary-container: #ffedd5;
+      --on-primary-container: #431407;
+      --bg: #faf6f3;
+      --surface-low: #f6eee8;
+      --swatch: #9a3412;
+    }
+
+    html[data-theme="dark"][data-accent="orange"] {
+      --primary: #ffb77d;
+      --on-primary: #4a2500;
+      --primary-container: #7a3e00;
+      --on-primary-container: #ffedd5;
+      --bg: #161310;
+      --surface-low: #221c17;
+    }
+
+    html[data-accent="rose"] {
+      --primary: #a21c55;
+      --on-primary: #ffffff;
+      --primary-container: #fce7f3;
+      --on-primary-container: #500724;
+      --bg: #faf5f7;
+      --surface-low: #f6ecef;
+      --swatch: #a21c55;
+    }
+
+    html[data-theme="dark"][data-accent="rose"] {
+      --primary: #ffb1c8;
+      --on-primary: #5e1133;
+      --primary-container: #8a234c;
+      --on-primary-container: #fce7f3;
+      --bg: #161214;
+      --surface-low: #22181d;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    [hidden] {
+      display: none !important;
+    }
+
+    body {
+      min-width: 320px;
+      min-height: 100vh;
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 15px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      transition: background-color 220ms ease, color 220ms ease;
+    }
+
+    button,
+    input,
+    textarea {
+      font: inherit;
+    }
+
+    button {
+      color: inherit;
+    }
+
+    .app-shell {
+      min-height: 100vh;
+    }
+
+    .topbar {
+      width: min(100% - 56px, 1160px);
+      height: 82px;
+      margin: 0 auto;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .brand {
+      display: inline-flex;
+      align-items: center;
+      gap: 12px;
+      color: var(--text);
+      text-decoration: none;
+    }
+
+    .brand-mark {
+      width: 43px;
+      height: 43px;
+      display: grid;
+      place-items: center;
+      border-radius: 16px;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+
+    .brand-mark svg,
+    .icon-button svg {
+      width: 22px;
+      height: 22px;
+    }
+
+    .brand-name {
+      font-size: 19px;
+      font-weight: 680;
+      letter-spacing: -0.045em;
+    }
+
+    .header-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .icon-button {
+      width: 46px;
+      height: 46px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      transition: background-color 180ms ease, transform 180ms ease;
+    }
+
+    .icon-button:hover,
+    .icon-button[aria-expanded="true"] {
+      background: var(--surface-high);
+    }
+
+    .icon-button:focus-visible,
+    .text-button:focus-visible,
+    .copy-button:focus-visible,
+    .primary-button:focus-visible,
+    .clear-file:focus-visible,
+    .swatch:focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 3px;
+    }
+
+    .theme-toggle:hover {
+      transform: rotate(-8deg);
+    }
+
+    .theme-toggle .moon-icon,
+    html[data-theme="dark"] .theme-toggle .sun-icon {
+      display: none;
+    }
+
+    html[data-theme="dark"] .theme-toggle .moon-icon {
+      display: block;
+    }
+
+    .palette-wrap {
+      position: relative;
+    }
+
+    .palette-menu {
+      position: absolute;
+      top: calc(100% + 8px);
+      right: 0;
+      z-index: 30;
+      width: 248px;
+      padding: 14px;
+      border: 1px solid var(--outline-soft);
+      border-radius: 20px;
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+
+    .palette-menu p {
+      margin: 0 0 12px;
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .swatches {
+      display: grid;
+      grid-template-columns: repeat(6, 1fr);
+      gap: 8px;
+    }
+
+    .swatch {
+      width: 28px;
+      height: 28px;
+      justify-self: center;
+      border: 0;
+      border-radius: 50%;
+      background: var(--swatch);
+      cursor: pointer;
+      box-shadow: inset 0 0 0 1px rgb(33 29 37 / 12%);
+    }
+
+    .swatch.is-active {
+      box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--text);
+    }
+
+    .page {
+      width: min(100% - 48px, 860px);
+      margin: 42px auto 76px;
+    }
+
+    .hero {
+      margin-bottom: 29px;
+      animation: rise-in 620ms cubic-bezier(.2, .7, .2, 1) both;
+    }
+
+    .eyebrow {
+      margin: 0 0 9px;
+      color: var(--primary);
+      font-size: 12px;
+      font-weight: 720;
+      letter-spacing: .13em;
+    }
+
+    h1 {
+      margin: -5px;
+      font-size: clamp(36px, 5vw, 47px);
+      font-weight: 620;
+      letter-spacing: -.055em;
+      line-height: 1.5;
+    }
+
+    .hero-description {
+      max-width: 640px;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 16px;
+      line-height: 1.7;
+    }
+
+    .drop-frame {
+      position: relative;
+    }
+
+    .dropzone {
+      width: 100%;
+      min-height: 168px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 28px 34px;
+      border: 1.5px dashed var(--outline);
+      border-radius: 28px;
+      background: var(--surface-low);
+      color: var(--text);
+      text-align: left;
+      cursor: pointer;
+      transition: transform 220ms ease, border-color 220ms ease, background-color 220ms ease, box-shadow 220ms ease;
+    }
+
+    .dropzone:hover,
+    .dropzone.is-dragging {
+      border-color: var(--primary);
+      background: var(--primary-container);
+      box-shadow: var(--shadow);
+      transform: translateY(-2px);
+    }
+
+    .dropzone:focus-visible {
+      outline: 3px solid var(--primary);
+      outline-offset: 4px;
+    }
+
+    .drop-state,
+    .file-state {
+      width: min(100%, 580px);
+      display: flex;
+      align-items: center;
+      gap: 17px;
+    }
+
+    .drop-state {
+      justify-content: center;
+    }
+
+    .drop-icon,
+    .file-icon {
+      width: 58px;
+      height: 58px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 20px;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+
+    .drop-icon svg,
+    .file-icon svg,
+    .empty-icon svg,
+    .banner-icon svg {
+      width: 24px;
+      height: 24px;
+    }
+
+    .drop-copy,
+    .file-details {
+      min-width: 0;
+      display: grid;
+      gap: 4px;
+    }
+
+    .drop-copy strong,
+    .file-details strong {
+      font-size: 17px;
+      font-weight: 610;
+      letter-spacing: -.02em;
+    }
+
+    .drop-copy>span,
+    .file-details>span,
+    .section-note,
+    .algo-footnote,
+    .compare-hint {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .select-hint {
+      color: var(--primary);
+      font-weight: 650;
+      text-decoration: underline;
+      text-decoration-color: transparent;
+      text-underline-offset: 3px;
+    }
+
+    .dropzone:hover .select-hint {
+      text-decoration-color: currentColor;
+    }
+
+    .file-state {
+      padding: 4px 42px 4px 0;
+    }
+
+    .file-details {
+      flex: 1;
+      text-align: left;
+    }
+
+    .file-details strong {
+      overflow-wrap: anywhere;
+    }
+
+    .replace-hint {
+      flex: 0 0 auto;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .clear-file {
+      position: absolute;
+      top: 13px;
+      right: 13px;
+      width: 38px;
+      height: 38px;
+      display: grid;
+      place-items: center;
+      border: 0;
+      border-radius: 50%;
+      background: var(--surface);
+      color: var(--muted);
+      cursor: pointer;
+    }
+
+    .clear-file:hover {
+      background: var(--surface-high);
+      color: var(--text);
+    }
+
+    .clear-file svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .visually-hidden {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      padding: 0;
+      margin: -1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
+
+    .panel {
+      margin-top: 22px;
+    }
+
+    .section-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 13px;
+    }
+
+    .section-head h2,
+    .results-heading h2 {
+      margin: 0;
+      font-size: 18px;
+      font-weight: 650;
+      letter-spacing: -.025em;
+    }
+
+    .section-title {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .inline-actions,
+    .results-actions {
+      display: flex;
+      align-items: center;
+      gap: 2px;
+    }
+
+    .algo-groups {
+      display: grid;
+      gap: 14px;
+    }
+
+    .algo-group-label {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 680;
+      letter-spacing: .06em;
+    }
+
+    .algorithm-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 9px;
+    }
+
+    .algorithm-option {
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      gap: 9px;
+      padding: 0 14px;
+      border: 1px solid var(--outline);
+      border-radius: 14px;
+      background: var(--surface);
+      color: var(--text);
+      cursor: pointer;
+      user-select: none;
+      transition: border-color 170ms ease, background-color 170ms ease, transform 170ms ease;
+    }
+
+    .algorithm-option:hover {
+      border-color: var(--primary);
+      transform: translateY(-1px);
+    }
+
+    .algorithm-option.is-selected {
+      border-color: transparent;
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+
+    .algorithm-option.is-disabled {
+      opacity: .48;
+      cursor: not-allowed;
+    }
+
+    .algorithm-option.is-disabled:hover {
+      border-color: var(--outline);
+      transform: none;
+    }
+
+    .algorithm-option:focus-within {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .algorithm-option input {
+      width: 17px;
+      height: 17px;
+      flex: 0 0 auto;
+      appearance: none;
+      display: grid;
+      place-items: center;
+      margin: 0;
+      border: 1.5px solid var(--outline);
+      border-radius: 5px;
+      background: var(--surface);
+      cursor: pointer;
+    }
+
+    .algorithm-option input::after {
+      width: 8px;
+      height: 5px;
+      content: "";
+      border-bottom: 1.8px solid var(--on-primary);
+      border-left: 1.8px solid var(--on-primary);
+      opacity: 0;
+      transform: translateY(-1px) rotate(-45deg);
+    }
+
+    .algorithm-option input:checked {
+      border-color: var(--primary);
+      background: var(--primary);
+    }
+
+    .algorithm-option input:checked::after {
+      opacity: 1;
+    }
+
+    .algorithm-name {
+      font-size: 13px;
+      font-weight: 620;
+    }
+
+    .algo-footnote {
+      margin: 12px 2px 0;
+    }
+
+    .compare-card {
+      margin-top: 22px;
+      padding: 18px;
+      border: 1px solid var(--outline-soft);
+      border-radius: 24px;
+      background: var(--surface);
+    }
+
+    .compare-card .section-head {
+      margin-bottom: 12px;
+    }
+
+    .expected-input {
+      width: 100%;
+      min-height: 84px;
+      resize: vertical;
+      padding: 14px 16px;
+      border: 0;
+      border-radius: 16px;
+      background: var(--surface-low);
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 13px;
+      line-height: 1.65;
+    }
+
+    .expected-input:focus {
+      outline: 2px solid var(--primary);
+      outline-offset: 2px;
+    }
+
+    .expected-input::placeholder {
+      color: var(--muted);
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+
+    .compare-tools {
+      min-height: 36px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      margin-top: 8px;
+    }
+
+    .compare-hint {
+      margin: 0;
+    }
+
+    .compare-banner {
+      display: flex;
+      align-items: flex-start;
+      gap: 12px;
+      margin-top: 12px;
+      padding: 13px 14px;
+      border-radius: 16px;
+    }
+
+    .compare-banner.is-match {
+      background: var(--success-container);
+      color: var(--on-success-container);
+    }
+
+    .compare-banner.is-mismatch,
+    .compare-banner.is-invalid {
+      background: var(--error-container);
+      color: var(--on-error-container);
+    }
+
+    .compare-banner.is-info {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+
+    .banner-icon {
+      width: 28px;
+      height: 28px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+    }
+
+    .banner-copy strong,
+    .banner-copy span {
+      display: block;
+    }
+
+    .banner-copy strong {
+      font-size: 14px;
+      font-weight: 680;
+    }
+
+    .banner-copy span {
+      margin-top: 2px;
+      font-size: 13px;
+      line-height: 1.55;
+    }
+
+    .action-row {
+      min-height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-top: 18px;
+    }
+
+    .status-line {
+      min-height: 22px;
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      overflow-wrap: anywhere;
+    }
+
+    .status-line.is-error {
+      color: var(--error);
+    }
+
+    .status-line.is-match {
+      color: var(--success);
+    }
+
+    .primary-button,
+    .text-button,
+    .copy-button {
+      border: 0;
+      cursor: pointer;
+    }
+
+    .primary-button {
+      min-width: 158px;
+      height: 50px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      padding: 0 23px;
+      border-radius: 17px;
+      background: var(--primary);
+      color: var(--on-primary);
+      font-size: 14px;
+      font-weight: 660;
+      box-shadow: 0 2px 5px rgb(38 27 57 / 13%);
+      transition: box-shadow 180ms ease, transform 180ms ease, opacity 180ms ease;
+    }
+
+    .primary-button:hover:not(:disabled) {
+      box-shadow: 0 5px 13px rgb(38 27 57 / 19%);
+      transform: translateY(-1px);
+    }
+
+    .primary-button:disabled,
+    .text-button:disabled {
+      cursor: not-allowed;
+      opacity: .52;
+    }
+
+    .primary-button:disabled {
+      box-shadow: none;
+    }
+
+    .primary-button svg,
+    .text-button svg,
+    .copy-button svg {
+      width: 18px;
+      height: 18px;
+    }
+
+    .button-spinner {
+      width: 17px;
+      height: 17px;
+      border: 2px solid currentColor;
+      border-right-color: transparent;
+      border-radius: 50%;
+      animation: spin 700ms linear infinite;
+    }
+
+    .results-section {
+      margin-top: 38px;
+      animation: rise-in 720ms 80ms cubic-bezier(.2, .7, .2, 1) both;
+    }
+
+    .results-heading {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 13px;
+    }
+
+    .text-button {
+      min-height: 40px;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 0 9px;
+      border-radius: 12px;
+      background: transparent;
+      color: var(--primary);
+      font-size: 13px;
+      font-weight: 650;
+    }
+
+    .text-button:hover:not(:disabled) {
+      background: var(--primary-container);
+    }
+
+    .text-button:disabled {
+      color: var(--muted);
+    }
+
+    .results-panel {
+      overflow: hidden;
+      border: 1px solid var(--outline-soft);
+      border-radius: 24px;
+      background: var(--surface);
+    }
+
+    .empty-result {
+      min-height: 132px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      padding: 25px;
+    }
+
+    .empty-icon {
+      width: 44px;
+      height: 44px;
+      flex: 0 0 auto;
+      display: grid;
+      place-items: center;
+      border-radius: 15px;
+      background: var(--surface-low);
+      color: var(--muted);
+    }
+
+    .empty-copy p {
+      margin: 0;
+    }
+
+    .empty-title {
+      font-size: 14px;
+      font-weight: 610;
+    }
+
+    .empty-description {
+      margin-top: 3px !important;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .results-panel.is-error .empty-icon {
+      background: var(--error-container);
+      color: var(--error);
+    }
+
+    .loading-track {
+      height: 3px;
+      overflow: hidden;
+      background: var(--surface-high);
+    }
+
+    .loading-track span {
+      width: 0;
+      height: 100%;
+      display: block;
+      background: var(--primary);
+      transition: width 180ms linear;
+    }
+
+    .digest-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 18px;
+      padding: 18px 20px;
+      animation: rise-in 380ms cubic-bezier(.2, .7, .2, 1) both;
+    }
+
+    .digest-row+.digest-row {
+      border-top: 1px solid var(--outline-soft);
+    }
+
+    .digest-row.is-match {
+      background: color-mix(in srgb, var(--success-container) 72%, var(--surface));
+    }
+
+    .digest-row.is-mismatch {
+      background: color-mix(in srgb, var(--error-container) 76%, var(--surface));
+    }
+
+    .digest-meta {
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 8px 10px;
+      margin-bottom: 8px;
+    }
+
+    .digest-algorithm {
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: .02em;
+    }
+
+    .digest-length {
+      color: var(--muted);
+      font-size: 11px;
+      letter-spacing: .04em;
+    }
+
+    .match-pill {
+      min-height: 22px;
+      display: inline-flex;
+      align-items: center;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .match-pill.is-match {
+      background: var(--success-container);
+      color: var(--on-success-container);
+    }
+
+    .match-pill.is-mismatch {
+      background: var(--error-container);
+      color: var(--on-error-container);
+    }
+
+    .digest-value {
+      display: block;
+      color: var(--text);
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+      font-size: 12px;
+      line-height: 1.75;
+      overflow-wrap: anywhere;
+      user-select: all;
+    }
+
+    .copy-button {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      border-radius: 13px;
+      background: var(--surface-low);
+      color: var(--muted);
+    }
+
+    .copy-button:hover,
+    .copy-button.is-copied {
+      background: var(--primary-container);
+      color: var(--on-primary-container);
+    }
+
+    .privacy-note {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      margin: 21px 2px 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    .privacy-note svg {
+      width: 16px;
+      height: 16px;
+      flex: 0 0 auto;
+      margin-top: 1px;
+      color: var(--primary);
+    }
+
+    .privacy-note p {
+      margin: 0;
+    }
+
+    @keyframes rise-in {
+      from {
+        opacity: 0;
+        transform: translateY(9px);
+      }
+
+      to {
+        opacity: 1;
+        transform: translateY(0);
+      }
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    @media (max-width: 640px) {
+
+      .topbar,
+      .page {
+        width: calc(100% - 32px);
+      }
+
+      .topbar {
+        height: 72px;
+      }
+
+      .page {
+        margin-top: 28px;
+      }
+
+      .dropzone {
+        min-height: 150px;
+        padding: 22px 18px;
+        border-radius: 24px;
+      }
+
+      .drop-icon,
+      .file-icon {
+        width: 50px;
+        height: 50px;
+      }
+
+      .replace-hint {
+        display: none;
+      }
+
+      .primary-button {
+        width: 100%;
+      }
+
+      .digest-row {
+        gap: 12px;
+        padding: 16px;
+      }
+
+      .digest-value {
+        font-size: 11px;
+      }
+    }
+
+    @media (max-width: 320px) {
+      .algorithm-option {
+        min-height: 40px;
+        padding: 0 10px;
+      }
+
+      .empty-result {
+        justify-content: flex-start;
+      }
+
+      .section-head,
+      .compare-tools,
+      .action-row,
+      .results-heading {
+        align-items: flex-start;
+        flex-direction: column;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        animation-duration: .01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: .01ms !important;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="brand" href="#top" aria-label="Hashroom 首页">
+        <span class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round">
+            <path d="M9 4 7.8 20M16.2 4 15 20M4.5 9h15M3.8 15h15" />
+          </svg>
+        </span>
+        <span class="brand-name">Hashroom</span>
+      </a>
+      <div class="header-actions">
+        <div class="palette-wrap">
+          <button class="icon-button" id="paletteToggle" type="button" aria-label="切换主题色" aria-expanded="false"
+            aria-controls="paletteMenu" title="切换主题色">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              stroke-linejoin="round" aria-hidden="true">
+              <path
+                d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10c1.38 0 2.5-.9 2.5-2v-1.2c0-.8.6-1.5 1.4-1.5h1.1c2.76 0 5-2.24 5-5 0-5.52-4.48-10-10-10z" />
+              <circle cx="6.5" cy="11.5" r="0.1" />
+              <path d="M9 6.5h.01M13 5.5h.01M17 8.5h.01" />
+            </svg>
+          </button>
+          <div class="palette-menu" id="paletteMenu" hidden>
+            <p>主题色</p>
+            <div class="swatches" id="swatchList" role="radiogroup" aria-label="主题色"></div>
+          </div>
+        </div>
+        <button class="icon-button theme-toggle" id="themeToggle" type="button" aria-label="切换深色模式" title="切换深色模式">
+          <svg class="sun-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" aria-hidden="true">
+            <circle cx="12" cy="12" r="4" />
+            <path
+              d="M12 2v2M12 20v2M4.93 4.93l1.42 1.42m11.3 11.3 1.42 1.42M2 12h2m16 0h2M4.93 19.07l1.42-1.42m11.3-11.3 1.42-1.42" />
+          </svg>
+          <svg class="moon-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M20.2 15.5A8.5 8.5 0 0 1 8.5 3.8 8.7 8.7 0 1 0 20.2 15.5Z" />
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <main class="page" id="top">
+      <section class="hero" aria-labelledby="pageTitle">
+        <p class="eyebrow">Made with ❤️ by lingyicute</p>
+        <h1 id="pageTitle">文件摘要小助手</h1>
+        <p class="hero-description">拖入文件，计算多种摘要，并与已有校验值比对。所有计算都在浏览器中完成。</p>
+      </section>
+
+      <section class="workspace" aria-label="文件哈希工具">
+        <input class="visually-hidden" id="fileInput" type="file" tabindex="-1" aria-label="选择要计算哈希的文件">
+        <div class="drop-frame">
+          <button class="dropzone" id="dropzone" type="button" aria-label="拖放文件到这里，或点击选择文件">
+            <span class="drop-state" id="emptyFileState">
+              <span class="drop-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5" />
+                  <path d="M5 14.5v3A2.5 2.5 0 0 0 7.5 20h9a2.5 2.5 0 0 0 2.5-2.5v-3" />
+                </svg>
+              </span>
+              <span class="drop-copy">
+                <strong>将文件拖放到这里</strong>
+                <span>或 <span class="select-hint">点击选择文件</span></span>
+              </span>
+            </span>
+            <span class="file-state" id="selectedFileState" hidden>
+              <span class="file-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <path d="M13.5 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8.5L13.5 3Z" />
+                  <path d="M13 3v6h6M8.5 14h7m-7 3h7" />
+                </svg>
+              </span>
+              <span class="file-details">
+                <strong id="fileName"></strong>
+                <span id="fileMeta"></span>
+              </span>
+              <span class="replace-hint">点击更换</span>
+            </span>
+          </button>
+          <button class="clear-file" id="clearFile" type="button" aria-label="移除已选文件" title="移除文件" hidden>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+              aria-hidden="true">
+              <path d="m7 7 10 10M17 7 7 17" />
+            </svg>
+          </button>
+        </div>
+
+        <section class="panel" aria-labelledby="algorithmTitle">
+          <div class="section-head">
+            <div class="section-title">
+              <h2 id="algorithmTitle">摘要算法</h2>
+              <span class="section-note" id="algorithmCount">已选 1 种</span>
+            </div>
+            <div class="inline-actions">
+              <button class="text-button" id="selectCommon" type="button">只选常用</button>
+              <button class="text-button" id="selectAll" type="button">全选</button>
+            </div>
+          </div>
+          <div class="algo-groups" id="algorithmMount"></div>
+          <p class="algo-footnote">MD5 与 SHA-1 只适合核对旧文件。CRC32 是校验和，不是密码学哈希。</p>
+        </section>
+
+        <section class="compare-card" aria-labelledby="compareTitle">
+          <div class="section-head">
+            <div class="section-title">
+              <h2 id="compareTitle">与已有值比对</h2>
+              <span class="section-note">可选</span>
+            </div>
+            <button class="text-button" id="clearExpected" type="button">清空</button>
+          </div>
+          <label>
+            <span class="visually-hidden">预期哈希</span>
+            <textarea class="expected-input" id="expectedInput" rows="3" spellcheck="false" autocapitalize="off"
+              autocorrect="off" placeholder="粘贴预期哈希，例如 SHA-256: e3b0c442… 或 sha256sum 输出"></textarea>
+          </label>
+          <div class="compare-tools">
+            <p class="compare-hint" id="compareHint">计算完成后会自动比对，忽略大小写和分隔符。</p>
+            <button class="text-button" id="applySuggested" type="button" hidden>补选可能的算法</button>
+          </div>
+          <div class="compare-banner" id="compareBanner" hidden role="status" aria-live="polite"></div>
+        </section>
+
+        <div class="action-row">
+          <p class="status-line" id="statusLine" role="status" aria-live="polite">尚未选择文件</p>
+          <button class="primary-button" id="computeButton" type="button" disabled>
+            <span class="button-spinner" id="buttonSpinner" aria-hidden="true" hidden></span>
+            <svg id="computeIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
+              stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M5 12h13m-5-5 5 5-5 5" />
+            </svg>
+            <span id="computeLabel">计算哈希</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="results-section" id="resultsSection" aria-labelledby="resultsTitle">
+        <div class="results-heading">
+          <h2 id="resultsTitle">计算结果</h2>
+          <button class="text-button" id="copyAllButton" type="button" disabled>
+            <span class="copy-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+                stroke-linejoin="round">
+                <rect x="8" y="8" width="12" height="12" rx="2" />
+                <path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2" />
+              </svg>
+            </span>
+            <span>复制全部</span>
+          </button>
+        </div>
+        <div class="results-panel" id="resultsPanel" aria-live="polite"></div>
+      </section>
+
+      <footer class="privacy-note">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+          stroke-linejoin="round" aria-hidden="true">
+          <rect x="4.5" y="10" width="15" height="11" rx="2.5" />
+          <path d="M8 10V7a4 4 0 0 1 8 0v3m-4 4v3" />
+        </svg>
+        <p>文件只在本机内存中读取和计算，不会上传到任何服务器。</p>
+      </footer>
+    </main>
+  </div>
+
+  <script>
+    const ACCENTS = [
+      {id: 'violet', label: '暮紫', swatch: '#6750a4'},
+      {id: 'blue', label: '海蓝', swatch: '#1a56c4'},
+      {id: 'teal', label: '青碧', swatch: '#0f6e66'},
+      {id: 'green', label: '森绿', swatch: '#1f7a3a'},
+      {id: 'orange', label: '暖橙', swatch: '#9a3412'},
+      {id: 'rose', label: '玫红', swatch: '#a21c55'}
+    ];
+
+    const ALGORITHM_GROUPS = [
+      {id: 'common', label: '常用'},
+      {id: 'sha2', label: 'SHA-2'},
+      {id: 'sha3', label: 'SHA-3'},
+      {id: 'other', label: '其他'}
+    ];
+
+    const ALGORITHMS = [
+      {id: 'MD5', group: 'common', bits: 128, title: 'MD5 已不适合安全场景，仅用于兼容旧校验值'},
+      {id: 'SHA-1', group: 'common', bits: 160, title: 'SHA-1 已不适合安全场景，仅用于兼容旧校验值'},
+      {id: 'SHA-256', group: 'common', bits: 256, checked: true},
+      {id: 'SHA-512', group: 'common', bits: 512},
+      {id: 'SHA-224', group: 'sha2', bits: 224},
+      {id: 'SHA-384', group: 'sha2', bits: 384},
+      {id: 'SHA-512/224', group: 'sha2', bits: 224},
+      {id: 'SHA-512/256', group: 'sha2', bits: 256},
+      {id: 'SHA3-224', group: 'sha3', bits: 224},
+      {id: 'SHA3-256', group: 'sha3', bits: 256},
+      {id: 'SHA3-384', group: 'sha3', bits: 384},
+      {id: 'SHA3-512', group: 'sha3', bits: 512},
+      {id: 'RIPEMD-160', group: 'other', bits: 160},
+      {id: 'CRC32', group: 'other', bits: 32, title: 'CRC32 是循环冗余校验，不是密码学哈希'}
+    ];
+
+    const WEB_CRYPTO = new Set(['SHA-1', 'SHA-256', 'SHA-384', 'SHA-512']);
+    const HASH_LENGTHS = new Set(ALGORITHMS.map(item => item.bits / 4));
+
+    const fileInput = document.getElementById('fileInput');
+    const dropzone = document.getElementById('dropzone');
+    const emptyFileState = document.getElementById('emptyFileState');
+    const selectedFileState = document.getElementById('selectedFileState');
+    const fileName = document.getElementById('fileName');
+    const fileMeta = document.getElementById('fileMeta');
+    const clearFileButton = document.getElementById('clearFile');
+    const algorithmMount = document.getElementById('algorithmMount');
+    const algorithmCount = document.getElementById('algorithmCount');
+    const expectedInput = document.getElementById('expectedInput');
+    const compareHint = document.getElementById('compareHint');
+    const compareBanner = document.getElementById('compareBanner');
+    const applySuggested = document.getElementById('applySuggested');
+    const clearExpected = document.getElementById('clearExpected');
+    const computeButton = document.getElementById('computeButton');
+    const computeIcon = document.getElementById('computeIcon');
+    const computeLabel = document.getElementById('computeLabel');
+    const buttonSpinner = document.getElementById('buttonSpinner');
+    const statusLine = document.getElementById('statusLine');
+    const resultsPanel = document.getElementById('resultsPanel');
+    const resultsSection = document.getElementById('resultsSection');
+    const copyAllButton = document.getElementById('copyAllButton');
+    const themeToggle = document.getElementById('themeToggle');
+    const paletteToggle = document.getElementById('paletteToggle');
+    const paletteMenu = document.getElementById('paletteMenu');
+    const swatchList = document.getElementById('swatchList');
+
+    const iconMarkup = {
+      hash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M9 4 7.8 20M16.2 4 15 20M4.5 9h15M3.8 15h15"/></svg>',
+      copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="2"/><path d="M16 8V6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h2"/></svg>',
+      check: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 4 4L19 6"/></svg>',
+      error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v6m0 4h.01"/></svg>',
+      clock: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>'
+    };
+
+    let algorithmInputs = [];
+    let selectedFile = null;
+    let currentResults = [];
+    let expectedEntries = [];
+    let expectedInvalid = false;
+    let isCalculating = false;
+    let runToken = 0;
+    const copyTimers = new WeakMap();
+
+    function rotr32(value, bits) {
+      return ((value >>> bits) | (value << (32 - bits))) >>> 0;
+    }
+
+    function rotl32(value, bits) {
+      return ((value << bits) | (value >>> (32 - bits))) >>> 0;
+    }
+
+    function readU32BE(bytes, offset) {
+      return ((bytes[offset] << 24) | (bytes[offset + 1] << 16) | (bytes[offset + 2] << 8) | bytes[offset + 3]) >>> 0;
+    }
+
+    function readU32LE(bytes, offset) {
+      return (bytes[offset] | (bytes[offset + 1] << 8) | (bytes[offset + 2] << 16) | (bytes[offset + 3] << 24)) >>> 0;
+    }
+
+    function writeU32BE(bytes, offset, value) {
+      bytes[offset] = value >>> 24;
+      bytes[offset + 1] = value >>> 16;
+      bytes[offset + 2] = value >>> 8;
+      bytes[offset + 3] = value;
+    }
+
+    function writeU32LE(bytes, offset, value) {
+      bytes[offset] = value;
+      bytes[offset + 1] = value >>> 8;
+      bytes[offset + 2] = value >>> 16;
+      bytes[offset + 3] = value >>> 24;
+    }
+
+    function bytesToHex(bytes) {
+      let hex = '';
+      for (let i = 0; i < bytes.length; i += 1) hex += bytes[i].toString(16).padStart(2, '0');
+      return hex;
+    }
+
+    function writeBitLength(buffer, offset, byteCount, lengthBytes, littleEndian) {
+      const bitLo = (byteCount << 3) >>> 0;
+      const bitHi = Math.floor(byteCount / 0x20000000);
+      if (lengthBytes === 8) {
+        if (littleEndian) {
+          writeU32LE(buffer, offset, bitLo);
+          writeU32LE(buffer, offset + 4, bitHi);
+        } else {
+          writeU32BE(buffer, offset, bitHi);
+          writeU32BE(buffer, offset + 4, bitLo);
+        }
+        return;
+      }
+      const hi64 = Math.floor(byteCount / 2 ** 61);
+      writeU32BE(buffer, offset, 0);
+      writeU32BE(buffer, offset + 4, hi64);
+      writeU32BE(buffer, offset + 8, bitHi);
+      writeU32BE(buffer, offset + 12, bitLo);
+    }
+
+    class BufferedHash {
+      constructor(blockSize) {
+        this.blockSize = blockSize;
+        this.buffer = new Uint8Array(blockSize);
+        this.bufferLen = 0;
+        this.totalLen = 0;
+      }
+
+      update(data) {
+        this.totalLen += data.length;
+        let offset = 0;
+        if (this.bufferLen) {
+          const take = Math.min(this.blockSize - this.bufferLen, data.length);
+          this.buffer.set(data.subarray(0, take), this.bufferLen);
+          this.bufferLen += take;
+          offset = take;
+          if (this.bufferLen === this.blockSize) {
+            this.process(this.buffer, 0);
+            this.bufferLen = 0;
+          }
+        }
+        while (offset + this.blockSize <= data.length) {
+          this.process(data, offset);
+          offset += this.blockSize;
+        }
+        if (offset < data.length) {
+          this.buffer.set(data.subarray(offset), 0);
+          this.bufferLen = data.length - offset;
+        }
+        return this;
+      }
+
+      finish(lengthBytes, littleEndian) {
+        this.buffer[this.bufferLen] = 0x80;
+        this.bufferLen += 1;
+        if (this.bufferLen > this.blockSize - lengthBytes) {
+          this.buffer.fill(0, this.bufferLen);
+          this.process(this.buffer, 0);
+          this.bufferLen = 0;
+        }
+        this.buffer.fill(0, this.bufferLen);
+        writeBitLength(this.buffer, this.blockSize - lengthBytes, this.totalLen, lengthBytes, littleEndian);
+        this.process(this.buffer, 0);
+      }
+    }
+
+    const MD5_S = [
+      7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+      4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+      6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+    ];
+    const MD5_T = new Uint32Array('d76aa478 e8c7b756 242070db c1bdceee f57c0faf 4787c62a a8304613 fd469501 698098d8 8b44f7af ffff5bb1 895cd7be 6b901122 fd987193 a679438e 49b40821 f61e2562 c040b340 265e5a51 e9b6c7aa d62f105d 02441453 d8a1e681 e7d3fbc8 21e1cde6 c33707d6 f4d50d87 455a14ed a9e3e905 fcefa3f8 676f02d9 8d2a4c8a fffa3942 8771f681 6d9d6122 fde5380c a4beea44 4bdecfa9 f6bb4b60 bebfbc70 289b7ec6 eaa127fa d4ef3085 04881d05 d9d4d039 e6db99e5 1fa27cf8 c4ac5665 f4292244 432aff97 ab9423a7 fc93a039 655b59c3 8f0ccc92 ffeff47d 85845dd1 6fa87e4f fe2ce6e0 a3014314 4e0811a1 f7537e82 bd3af235 2ad7d2bb eb86d391'.split(' ').map(hex => parseInt(hex, 16)));
+
+    class Md5 extends BufferedHash {
+      constructor() {
+        super(64);
+        this.h = new Uint32Array([0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476]);
+      }
+
+      process(block, offset) {
+        const m = new Uint32Array(16);
+        for (let i = 0; i < 16; i += 1) m[i] = readU32LE(block, offset + i * 4);
+        let a = this.h[0];
+        let b = this.h[1];
+        let c = this.h[2];
+        let d = this.h[3];
+        for (let i = 0; i < 64; i += 1) {
+          let f;
+          let g;
+          if (i < 16) {
+            f = (b & c) | (~b & d);
+            g = i;
+          } else if (i < 32) {
+            f = (d & b) | (~d & c);
+            g = (5 * i + 1) % 16;
+          } else if (i < 48) {
+            f = b ^ c ^ d;
+            g = (3 * i + 5) % 16;
+          } else {
+            f = c ^ (b | ~d);
+            g = (7 * i) % 16;
+          }
+          const next = (a + f + m[g] + MD5_T[i]) >>> 0;
+          a = d;
+          d = c;
+          c = b;
+          b = (b + rotl32(next, MD5_S[i])) >>> 0;
+        }
+        this.h[0] = (this.h[0] + a) >>> 0;
+        this.h[1] = (this.h[1] + b) >>> 0;
+        this.h[2] = (this.h[2] + c) >>> 0;
+        this.h[3] = (this.h[3] + d) >>> 0;
+      }
+
+      digest() {
+        this.finish(8, true);
+        const out = new Uint8Array(16);
+        for (let i = 0; i < 4; i += 1) writeU32LE(out, i * 4, this.h[i]);
+        return bytesToHex(out);
+      }
+    }
+
+    class Sha1 extends BufferedHash {
+      constructor() {
+        super(64);
+        this.h = new Uint32Array([0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0]);
+      }
+
+      process(block, offset) {
+        const w = new Uint32Array(80);
+        for (let i = 0; i < 16; i += 1) w[i] = readU32BE(block, offset + i * 4);
+        for (let i = 16; i < 80; i += 1) w[i] = rotl32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
+        let a = this.h[0];
+        let b = this.h[1];
+        let c = this.h[2];
+        let d = this.h[3];
+        let e = this.h[4];
+        for (let i = 0; i < 80; i += 1) {
+          let f;
+          let k;
+          if (i < 20) {
+            f = (b & c) | (~b & d);
+            k = 0x5a827999;
+          } else if (i < 40) {
+            f = b ^ c ^ d;
+            k = 0x6ed9eba1;
+          } else if (i < 60) {
+            f = (b & c) | (b & d) | (c & d);
+            k = 0x8f1bbcdc;
+          } else {
+            f = b ^ c ^ d;
+            k = 0xca62c1d6;
+          }
+          const next = (rotl32(a, 5) + f + e + k + w[i]) >>> 0;
+          e = d;
+          d = c;
+          c = rotl32(b, 30);
+          b = a;
+          a = next;
+        }
+        this.h[0] = (this.h[0] + a) >>> 0;
+        this.h[1] = (this.h[1] + b) >>> 0;
+        this.h[2] = (this.h[2] + c) >>> 0;
+        this.h[3] = (this.h[3] + d) >>> 0;
+        this.h[4] = (this.h[4] + e) >>> 0;
+      }
+
+      digest() {
+        this.finish(8, false);
+        const out = new Uint8Array(20);
+        for (let i = 0; i < 5; i += 1) writeU32BE(out, i * 4, this.h[i]);
+        return bytesToHex(out);
+      }
+    }
+
+    const K256 = new Uint32Array('428a2f98 71374491 b5c0fbcf e9b5dba5 3956c25b 59f111f1 923f82a4 ab1c5ed5 d807aa98 12835b01 243185be 550c7dc3 72be5d74 80deb1fe 9bdc06a7 c19bf174 e49b69c1 efbe4786 0fc19dc6 240ca1cc 2de92c6f 4a7484aa 5cb0a9dc 76f988da 983e5152 a831c66d b00327c8 bf597fc7 c6e00bf3 d5a79147 06ca6351 14292967 27b70a85 2e1b2138 4d2c6dfc 53380d13 650a7354 766a0abb 81c2c92e 92722c85 a2bfe8a1 a81a664b c24b8b70 c76c51a3 d192e819 d6990624 f40e3585 106aa070 19a4c116 1e376c08 2748774c 34b0bcb5 391c0cb3 4ed8aa4a 5b9cca4f 682e6ff3 748f82ee 78a5636f 84c87814 8cc70208 90befffa a4506ceb bef9a3f7 c67178f2'.split(' ').map(hex => parseInt(hex, 16)));
+
+    class Sha256 extends BufferedHash {
+      constructor(iv, outBytes) {
+        super(64);
+        this.h = iv;
+        this.outBytes = outBytes;
+      }
+
+      process(block, offset) {
+        const w = new Uint32Array(64);
+        for (let i = 0; i < 16; i += 1) w[i] = readU32BE(block, offset + i * 4);
+        for (let i = 16; i < 64; i += 1) {
+          const s0 = (rotr32(w[i - 15], 7) ^ rotr32(w[i - 15], 18) ^ (w[i - 15] >>> 3)) >>> 0;
+          const s1 = (rotr32(w[i - 2], 17) ^ rotr32(w[i - 2], 19) ^ (w[i - 2] >>> 10)) >>> 0;
+          w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+        }
+        let a = this.h[0];
+        let b = this.h[1];
+        let c = this.h[2];
+        let d = this.h[3];
+        let e = this.h[4];
+        let f = this.h[5];
+        let g = this.h[6];
+        let h = this.h[7];
+        for (let i = 0; i < 64; i += 1) {
+          const s1 = (rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25)) >>> 0;
+          const ch = ((e & f) ^ (~e & g)) >>> 0;
+          const t1 = (h + s1 + ch + K256[i] + w[i]) >>> 0;
+          const s0 = (rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22)) >>> 0;
+          const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
+          const t2 = (s0 + maj) >>> 0;
+          h = g;
+          g = f;
+          f = e;
+          e = (d + t1) >>> 0;
+          d = c;
+          c = b;
+          b = a;
+          a = (t1 + t2) >>> 0;
+        }
+        this.h[0] = (this.h[0] + a) >>> 0;
+        this.h[1] = (this.h[1] + b) >>> 0;
+        this.h[2] = (this.h[2] + c) >>> 0;
+        this.h[3] = (this.h[3] + d) >>> 0;
+        this.h[4] = (this.h[4] + e) >>> 0;
+        this.h[5] = (this.h[5] + f) >>> 0;
+        this.h[6] = (this.h[6] + g) >>> 0;
+        this.h[7] = (this.h[7] + h) >>> 0;
+      }
+
+      digest() {
+        this.finish(8, false);
+        const out = new Uint8Array(this.outBytes);
+        for (let i = 0; i < this.outBytes; i += 1) {
+          out[i] = (this.h[i >> 2] >>> (24 - (i % 4) * 8)) & 255;
+        }
+        return bytesToHex(out);
+      }
+    }
+
+    function rotrHi(hi, lo, bits) {
+      bits &= 63;
+      if (bits === 0) return hi;
+      if (bits === 32) return lo;
+      if (bits < 32) return ((hi >>> bits) | (lo << (32 - bits))) >>> 0;
+      bits -= 32;
+      return ((lo >>> bits) | (hi << (32 - bits))) >>> 0;
+    }
+
+    function rotrLo(hi, lo, bits) {
+      bits &= 63;
+      if (bits === 0) return lo;
+      if (bits === 32) return hi;
+      if (bits < 32) return ((lo >>> bits) | (hi << (32 - bits))) >>> 0;
+      bits -= 32;
+      return ((hi >>> bits) | (lo << (32 - bits))) >>> 0;
+    }
+
+    function shrHi(hi, bits) {
+      if (bits === 0) return hi;
+      if (bits < 32) return hi >>> bits;
+      return 0;
+    }
+
+    function shrLo(hi, lo, bits) {
+      if (bits === 0) return lo;
+      if (bits < 32) return ((hi << (32 - bits)) | (lo >>> bits)) >>> 0;
+      if (bits === 32) return hi;
+      return hi >>> (bits - 32);
+    }
+
+    const K512 = new Uint32Array(160);
+    '428a2f98d728ae22 7137449123ef65cd b5c0fbcfec4d3b2f e9b5dba58189dbbc 3956c25bf348b538 59f111f1b605d019 923f82a4af194f9b ab1c5ed5da6d8118 d807aa98a3030242 12835b0145706fbe 243185be4ee4b28c 550c7dc3d5ffb4e2 72be5d74f27b896f 80deb1fe3b1696b1 9bdc06a725c71235 c19bf174cf692694 e49b69c19ef14ad2 efbe4786384f25e3 0fc19dc68b8cd5b5 240ca1cc77ac9c65 2de92c6f592b0275 4a7484aa6ea6e483 5cb0a9dcbd41fbd4 76f988da831153b5 983e5152ee66dfab a831c66d2db43210 b00327c898fb213f bf597fc7beef0ee4 c6e00bf33da88fc2 d5a79147930aa725 06ca6351e003826f 142929670a0e6e70 27b70a8546d22ffc 2e1b21385c26c926 4d2c6dfc5ac42aed 53380d139d95b3df 650a73548baf63de 766a0abb3c77b2a8 81c2c92e47edaee6 92722c851482353b a2bfe8a14cf10364 a81a664bbc423001 c24b8b70d0f89791 c76c51a30654be30 d192e819d6ef5218 d69906245565a910 f40e35855771202a 106aa07032bbd1b8 19a4c116b8d2d0c8 1e376c085141ab53 2748774cdf8eeb99 34b0bcb5e19b48a8 391c0cb3c5c95a63 4ed8aa4ae3418acb 5b9cca4f7763e373 682e6ff3d6b2b8a3 748f82ee5defb2fc 78a5636f43172f60 84c87814a1f0ab72 8cc702081a6439ec 90befffa23631e28 a4506cebde82bde9 bef9a3f7b2c67915 c67178f2e372532b ca273eceea26619c d186b8c721c0c207 eada7dd6cde0eb1e f57d4f7fee6ed178 06f067aa72176fba 0a637dc5a2c898a6 113f9804bef90dae 1b710b35131c471b 28db77f523047d84 32caab7b40c72493 3c9ebe0a15c9bebc 431d67c49c100d4c 4cc5d4becb3e42b6 597f299cfc657e2a 5fcb6fab3ad6faec 6c44198c4a475817'.split(' ').forEach((hex, index) => {
+      K512[index * 2] = parseInt(hex.slice(0, 8), 16);
+      K512[index * 2 + 1] = parseInt(hex.slice(8), 16);
+    });
+
+    class Sha512 extends BufferedHash {
+      constructor(ivHex, outBytes) {
+        super(128);
+        this.h = new Uint32Array(16);
+        ivHex.forEach((hex, index) => {
+          this.h[index * 2] = parseInt(hex.slice(0, 8), 16);
+          this.h[index * 2 + 1] = parseInt(hex.slice(8), 16);
+        });
+        this.outBytes = outBytes;
+        this.w = new Uint32Array(160);
+      }
+
+      process(block, offset) {
+        const w = this.w;
+        for (let i = 0; i < 16; i += 1) {
+          w[i * 2] = readU32BE(block, offset + i * 8);
+          w[i * 2 + 1] = readU32BE(block, offset + i * 8 + 4);
+        }
+        for (let i = 16; i < 80; i += 1) {
+          const ahi = w[(i - 15) * 2];
+          const alo = w[(i - 15) * 2 + 1];
+          const bhi = w[(i - 2) * 2];
+          const blo = w[(i - 2) * 2 + 1];
+          const s0hi = (rotrHi(ahi, alo, 1) ^ rotrHi(ahi, alo, 8) ^ shrHi(ahi, 7)) >>> 0;
+          const s0lo = (rotrLo(ahi, alo, 1) ^ rotrLo(ahi, alo, 8) ^ shrLo(ahi, alo, 7)) >>> 0;
+          const s1hi = (rotrHi(bhi, blo, 19) ^ rotrHi(bhi, blo, 61) ^ shrHi(bhi, 6)) >>> 0;
+          const s1lo = (rotrLo(bhi, blo, 19) ^ rotrLo(bhi, blo, 61) ^ shrLo(bhi, blo, 6)) >>> 0;
+          const p15hi = w[(i - 16) * 2];
+          const p15lo = w[(i - 16) * 2 + 1];
+          const p7hi = w[(i - 7) * 2];
+          const p7lo = w[(i - 7) * 2 + 1];
+          let lo = (p15lo + s0lo) >>> 0;
+          let hi = (p15hi + s0hi + (lo < p15lo ? 1 : 0)) >>> 0;
+          const lo2 = (lo + p7lo) >>> 0;
+          hi = (hi + p7hi + (lo2 < lo ? 1 : 0)) >>> 0;
+          lo = lo2;
+          const lo3 = (lo + s1lo) >>> 0;
+          w[i * 2] = (hi + s1hi + (lo3 < lo ? 1 : 0)) >>> 0;
+          w[i * 2 + 1] = lo3;
+        }
+        const v = this.h.slice();
+        for (let i = 0; i < 80; i += 1) {
+          const ehi = v[8];
+          const elo = v[9];
+          const fhi = v[10];
+          const flo = v[11];
+          const ghi = v[12];
+          const glo = v[13];
+          const ahi = v[0];
+          const alo = v[1];
+          const bhi = v[2];
+          const blo = v[3];
+          const chi = v[4];
+          const clo = v[5];
+          const s1hi = (rotrHi(ehi, elo, 14) ^ rotrHi(ehi, elo, 18) ^ rotrHi(ehi, elo, 41)) >>> 0;
+          const s1lo = (rotrLo(ehi, elo, 14) ^ rotrLo(ehi, elo, 18) ^ rotrLo(ehi, elo, 41)) >>> 0;
+          const chhi = ((ehi & fhi) ^ (~ehi & ghi)) >>> 0;
+          const chlo = ((elo & flo) ^ (~elo & glo)) >>> 0;
+          const s0hi = (rotrHi(ahi, alo, 28) ^ rotrHi(ahi, alo, 34) ^ rotrHi(ahi, alo, 39)) >>> 0;
+          const s0lo = (rotrLo(ahi, alo, 28) ^ rotrLo(ahi, alo, 34) ^ rotrLo(ahi, alo, 39)) >>> 0;
+          const majhi = ((ahi & bhi) ^ (ahi & chi) ^ (bhi & chi)) >>> 0;
+          const majlo = ((alo & blo) ^ (alo & clo) ^ (blo & clo)) >>> 0;
+          const parts = [
+            [v[14], v[15]],
+            [s1hi, s1lo],
+            [chhi, chlo],
+            [K512[i * 2], K512[i * 2 + 1]],
+            [w[i * 2], w[i * 2 + 1]]
+          ];
+          let t1hi = 0;
+          let t1lo = 0;
+          parts.forEach(part => {
+            const nextLo = (t1lo + part[1]) >>> 0;
+            t1hi = (t1hi + part[0] + (nextLo < t1lo ? 1 : 0)) >>> 0;
+            t1lo = nextLo;
+          });
+          const t2lo = (s0lo + majlo) >>> 0;
+          const t2hi = (s0hi + majhi + (t2lo < s0lo ? 1 : 0)) >>> 0;
+          v[14] = v[12];
+          v[15] = v[13];
+          v[12] = v[10];
+          v[13] = v[11];
+          v[10] = v[8];
+          v[11] = v[9];
+          const elo2 = (v[7] + t1lo) >>> 0;
+          v[8] = (v[6] + t1hi + (elo2 < v[7] ? 1 : 0)) >>> 0;
+          v[9] = elo2;
+          v[6] = v[4];
+          v[7] = v[5];
+          v[4] = v[2];
+          v[5] = v[3];
+          v[2] = v[0];
+          v[3] = v[1];
+          const alo2 = (t1lo + t2lo) >>> 0;
+          v[0] = (t1hi + t2hi + (alo2 < t1lo ? 1 : 0)) >>> 0;
+          v[1] = alo2;
+        }
+        for (let i = 0; i < 8; i += 1) {
+          const lo = (this.h[i * 2 + 1] + v[i * 2 + 1]) >>> 0;
+          this.h[i * 2] = (this.h[i * 2] + v[i * 2] + (lo < this.h[i * 2 + 1] ? 1 : 0)) >>> 0;
+          this.h[i * 2 + 1] = lo;
+        }
+      }
+
+      digest() {
+        this.finish(16, false);
+        const out = new Uint8Array(this.outBytes);
+        for (let i = 0; i < this.outBytes; i += 1) {
+          const word = this.h[(i >> 2) < 2 ? i >> 2 : Math.floor(i / 4)];
+          out[i] = (this.h[Math.floor(i / 4)] >>> ((3 - (i % 4)) * 8)) & 255;
+        }
+        return bytesToHex(out);
+      }
+    }
+
+    const KECCAK_RHO = [1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14, 27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44];
+    const KECCAK_PI = [10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1];
+    const KECCAK_RC = '0000000000000001 0000000000008082 800000000000808a 8000000080008000 000000000000808b 0000000080000001 8000000080008081 8000000000008009 000000000000008a 0000000000000088 0000000080008009 000000008000000a 000000008000808b 800000000000008b 8000000000008089 8000000000008003 8000000000008002 8000000000000080 000000000000800a 800000008000000a 8000000080008081 8000000000008080 0000000080000001 8000000080008008'.split(' ').map(hex => [parseInt(hex.slice(8), 16), parseInt(hex.slice(0, 8), 16)]);
+
+    function rotlLane(lo, hi, bits) {
+      bits &= 63;
+      if (bits === 0) return [lo, hi];
+      if (bits === 32) return [hi, lo];
+      if (bits < 32) {
+        return [((lo << bits) | (hi >>> (32 - bits))) >>> 0, ((hi << bits) | (lo >>> (32 - bits))) >>> 0];
+      }
+      bits -= 32;
+      return [((hi << bits) | (lo >>> (32 - bits))) >>> 0, ((lo << bits) | (hi >>> (32 - bits))) >>> 0];
+    }
+
+    function keccakF(state) {
+      for (let round = 0; round < 24; round += 1) {
+        const c = new Uint32Array(10);
+        for (let x = 0; x < 5; x += 1) {
+          let lo = state[x * 2];
+          let hi = state[x * 2 + 1];
+          for (let y = 1; y < 5; y += 1) {
+            lo ^= state[(x + 5 * y) * 2];
+            hi ^= state[(x + 5 * y) * 2 + 1];
+          }
+          c[x * 2] = lo >>> 0;
+          c[x * 2 + 1] = hi >>> 0;
+        }
+        const d = new Uint32Array(10);
+        for (let x = 0; x < 5; x += 1) {
+          const x1 = ((x + 1) % 5) * 2;
+          const x4 = ((x + 4) % 5) * 2;
+          const rlo = ((c[x1] << 1) | (c[x1 + 1] >>> 31)) >>> 0;
+          const rhi = ((c[x1 + 1] << 1) | (c[x1] >>> 31)) >>> 0;
+          d[x * 2] = (c[x4] ^ rlo) >>> 0;
+          d[x * 2 + 1] = (c[x4 + 1] ^ rhi) >>> 0;
+        }
+        for (let i = 0; i < 25; i += 1) {
+          const x = (i % 5) * 2;
+          state[i * 2] = (state[i * 2] ^ d[x]) >>> 0;
+          state[i * 2 + 1] = (state[i * 2 + 1] ^ d[x + 1]) >>> 0;
+        }
+        let lastLo = state[2];
+        let lastHi = state[3];
+        for (let i = 0; i < 24; i += 1) {
+          const pi = KECCAK_PI[i] * 2;
+          const curLo = state[pi];
+          const curHi = state[pi + 1];
+          const rotated = rotlLane(lastLo, lastHi, KECCAK_RHO[i]);
+          state[pi] = rotated[0];
+          state[pi + 1] = rotated[1];
+          lastLo = curLo;
+          lastHi = curHi;
+        }
+        for (let y = 0; y < 5; y += 1) {
+          const base = y * 5;
+          const row = new Uint32Array(10);
+          for (let x = 0; x < 5; x += 1) {
+            row[x * 2] = state[(base + x) * 2];
+            row[x * 2 + 1] = state[(base + x) * 2 + 1];
+          }
+          for (let x = 0; x < 5; x += 1) {
+            const one = ((x + 1) % 5) * 2;
+            const two = ((x + 2) % 5) * 2;
+            const at = (base + x) * 2;
+            state[at] = (row[x * 2] ^ ((~row[one]) & row[two])) >>> 0;
+            state[at + 1] = (row[x * 2 + 1] ^ ((~row[one + 1]) & row[two + 1])) >>> 0;
+          }
+        }
+        state[0] = (state[0] ^ KECCAK_RC[round][0]) >>> 0;
+        state[1] = (state[1] ^ KECCAK_RC[round][1]) >>> 0;
+      }
+    }
+
+    class Sha3 {
+      constructor(rate, outLen) {
+        this.rate = rate;
+        this.outLen = outLen;
+        this.state = new Uint8Array(200);
+        this.lanes = new Uint32Array(50);
+        this.offset = 0;
+      }
+
+      update(data) {
+        let index = 0;
+        while (index < data.length) {
+          const take = Math.min(this.rate - this.offset, data.length - index);
+          for (let i = 0; i < take; i += 1) this.state[this.offset + i] ^= data[index + i];
+          this.offset += take;
+          index += take;
+          if (this.offset === this.rate) {
+            this.permute();
+            this.offset = 0;
+          }
+        }
+        return this;
+      }
+
+      permute() {
+        for (let i = 0; i < 25; i += 1) {
+          const at = i * 8;
+          this.lanes[i * 2] = (this.state[at] | (this.state[at + 1] << 8) | (this.state[at + 2] << 16) | (this.state[at + 3] << 24)) >>> 0;
+          this.lanes[i * 2 + 1] = (this.state[at + 4] | (this.state[at + 5] << 8) | (this.state[at + 6] << 16) | (this.state[at + 7] << 24)) >>> 0;
+        }
+        keccakF(this.lanes);
+        for (let i = 0; i < 25; i += 1) {
+          const at = i * 8;
+          const lo = this.lanes[i * 2];
+          const hi = this.lanes[i * 2 + 1];
+          this.state[at] = lo;
+          this.state[at + 1] = lo >>> 8;
+          this.state[at + 2] = lo >>> 16;
+          this.state[at + 3] = lo >>> 24;
+          this.state[at + 4] = hi;
+          this.state[at + 5] = hi >>> 8;
+          this.state[at + 6] = hi >>> 16;
+          this.state[at + 7] = hi >>> 24;
+        }
+      }
+
+      digest() {
+        this.state[this.offset] ^= 0x06;
+        this.state[this.rate - 1] ^= 0x80;
+        this.permute();
+        return bytesToHex(this.state.subarray(0, this.outLen));
+      }
+    }
+
+    const RIPEMD_IL = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 7, 4, 13, 1, 10, 6, 15, 3, 12, 0, 9, 5, 2, 14, 11, 8, 3, 10, 14, 4, 9, 15, 8, 1, 2, 7, 0, 6, 13, 11, 5, 12, 1, 9, 11, 10, 0, 8, 12, 4, 13, 3, 7, 15, 14, 5, 6, 2, 4, 0, 5, 9, 7, 12, 2, 10, 14, 1, 3, 8, 11, 6, 15, 13];
+    const RIPEMD_IR = [5, 14, 7, 0, 9, 2, 11, 4, 13, 6, 15, 8, 1, 10, 3, 12, 6, 11, 3, 7, 0, 13, 5, 10, 14, 15, 8, 12, 4, 9, 1, 2, 15, 5, 1, 3, 7, 14, 6, 9, 11, 8, 12, 2, 10, 0, 4, 13, 8, 6, 4, 1, 3, 11, 15, 0, 5, 12, 2, 13, 9, 7, 10, 14, 12, 15, 10, 4, 1, 5, 8, 7, 6, 2, 13, 14, 0, 3, 9, 11];
+    const RIPEMD_SL = [11, 14, 15, 12, 5, 8, 7, 9, 11, 13, 14, 15, 6, 7, 9, 8, 7, 6, 8, 13, 11, 9, 7, 15, 7, 12, 15, 9, 11, 7, 13, 12, 11, 13, 6, 7, 14, 9, 13, 15, 14, 8, 13, 6, 5, 12, 7, 5, 11, 12, 14, 15, 14, 15, 9, 8, 9, 14, 5, 6, 8, 6, 5, 12, 9, 15, 5, 11, 6, 8, 13, 12, 5, 12, 13, 14, 11, 8, 5, 6];
+    const RIPEMD_SR = [8, 9, 9, 11, 13, 15, 15, 5, 7, 7, 8, 11, 14, 14, 12, 6, 9, 13, 15, 7, 12, 8, 9, 11, 7, 7, 12, 7, 6, 15, 13, 11, 9, 7, 15, 11, 8, 6, 6, 14, 12, 13, 5, 14, 13, 13, 7, 5, 15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8, 8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11];
+    const RIPEMD_KL = Uint32Array.of(0x00000000, 0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xa953fd4e);
+    const RIPEMD_KR = Uint32Array.of(0x50a28be6, 0x5c4dd124, 0x6d703ef3, 0x7a6d76e9, 0x00000000);
+    const RIPEMD_FL = [
+      (b, c, d) => (b ^ c ^ d) >>> 0,
+      (b, c, d) => ((b & c) | ((~b >>> 0) & d)) >>> 0,
+      (b, c, d) => ((b | (~c >>> 0)) ^ d) >>> 0,
+      (b, c, d) => ((b & d) | (c & (~d >>> 0))) >>> 0,
+      (b, c, d) => (b ^ (c | (~d >>> 0))) >>> 0
+    ];
+    const RIPEMD_FR = RIPEMD_FL.slice().reverse();
+
+    class Ripemd160 extends BufferedHash {
+      constructor() {
+        super(64);
+        this.h = new Uint32Array([0x67452301, 0xefcdab89, 0x98badcfe, 0x10325476, 0xc3d2e1f0]);
+      }
+
+      process(block, offset) {
+        const w = new Uint32Array(16);
+        for (let i = 0; i < 16; i += 1) w[i] = readU32LE(block, offset + i * 4);
+        let al = this.h[0];
+        let bl = this.h[1];
+        let cl = this.h[2];
+        let dl = this.h[3];
+        let el = this.h[4];
+        let ar = al;
+        let br = bl;
+        let cr = cl;
+        let dr = dl;
+        let er = el;
+        for (let i = 0; i < 80; i += 1) {
+          const round = i >> 4;
+          const tl = (al + RIPEMD_FL[round](bl, cl, dl) + w[RIPEMD_IL[i]] + RIPEMD_KL[round]) >>> 0;
+          const nal = (rotl32(tl, RIPEMD_SL[i]) + el) >>> 0;
+          al = el;
+          el = dl;
+          dl = rotl32(cl, 10);
+          cl = bl;
+          bl = nal;
+          const tr = (ar + RIPEMD_FR[round](br, cr, dr) + w[RIPEMD_IR[i]] + RIPEMD_KR[round]) >>> 0;
+          const nar = (rotl32(tr, RIPEMD_SR[i]) + er) >>> 0;
+          ar = er;
+          er = dr;
+          dr = rotl32(cr, 10);
+          cr = br;
+          br = nar;
+        }
+        const t = (this.h[1] + cl + dr) >>> 0;
+        this.h[1] = (this.h[2] + dl + er) >>> 0;
+        this.h[2] = (this.h[3] + el + ar) >>> 0;
+        this.h[3] = (this.h[4] + al + br) >>> 0;
+        this.h[4] = (this.h[0] + bl + cr) >>> 0;
+        this.h[0] = t;
+      }
+
+      digest() {
+        this.finish(8, true);
+        const out = new Uint8Array(20);
+        for (let i = 0; i < 5; i += 1) writeU32LE(out, i * 4, this.h[i]);
+        return bytesToHex(out);
+      }
+    }
+
+    const CRC_TABLE = (() => {
+      const table = new Uint32Array(256);
+      for (let i = 0; i < 256; i += 1) {
+        let c = i;
+        for (let bit = 0; bit < 8; bit += 1) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
+        table[i] = c >>> 0;
+      }
+      return table;
+    })();
+
+    class Crc32 {
+      constructor() {
+        this.crc = 0xffffffff;
+      }
+
+      update(data) {
+        let c = this.crc;
+        for (let i = 0; i < data.length; i += 1) c = (CRC_TABLE[(c ^ data[i]) & 255] ^ (c >>> 8)) >>> 0;
+        this.crc = c;
+        return this;
+      }
+
+      digest() {
+        return ((this.crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, '0');
+      }
+    }
+
+    function createHasher(id) {
+      switch (id) {
+        case 'MD5': return new Md5();
+        case 'SHA-1': return new Sha1();
+        case 'SHA-224': return new Sha256(new Uint32Array([0xc1059ed8, 0x367cd507, 0x3070dd17, 0xf70e5939, 0xffc00b31, 0x68581511, 0x64f98fa7, 0xbefa4fa4]), 28);
+        case 'SHA-256': return new Sha256(new Uint32Array([0x6a09e667, 0xbb67ae85, 0x3c6ef372, 0xa54ff53a, 0x510e527f, 0x9b05688c, 0x1f83d9ab, 0x5be0cd19]), 32);
+        case 'SHA-384': return new Sha512(['cbbb9d5dc1059ed8', '629a292a367cd507', '9159015a3070dd17', '152fecd8f70e5939', '67332667ffc00b31', '8eb44a8768581511', 'db0c2e0d64f98fa7', '47b5481dbefa4fa4'], 48);
+        case 'SHA-512': return new Sha512(['6a09e667f3bcc908', 'bb67ae8584caa73b', '3c6ef372fe94f82b', 'a54ff53a5f1d36f1', '510e527fade682d1', '9b05688c2b3e6c1f', '1f83d9abfb41bd6b', '5be0cd19137e2179'], 64);
+        case 'SHA-512/224': return new Sha512(['8c3d37c819544da2', '73e1996689dcd4d6', '1dfab7ae32ff9c82', '679dd514582f9fcf', '0f6d2b697bd44da8', '77e36f7304c48942', '3f9d85a86a1d36c8', '1112e6ad91d692a1'], 28);
+        case 'SHA-512/256': return new Sha512(['22312194fc2bf72c', '9f555fa3c84c64c2', '2393b86b6f53b151', '963877195940eabd', '96283ee2a88effe3', 'be5e1e2553863992', '2b0199fc2c85b8aa', '0eb72ddc81c52ca2'], 32);
+        case 'SHA3-224': return new Sha3(144, 28);
+        case 'SHA3-256': return new Sha3(136, 32);
+        case 'SHA3-384': return new Sha3(104, 48);
+        case 'SHA3-512': return new Sha3(72, 64);
+        case 'RIPEMD-160': return new Ripemd160();
+        case 'CRC32': return new Crc32();
+        default: throw new Error(`Unknown algorithm: ${id}`);
+      }
+    }
+
+    function digestBytes(id, bytes) {
+      const hasher = createHasher(id);
+      const step = 1024 * 1024;
+      for (let offset = 0; offset < bytes.length; offset += step) hasher.update(bytes.subarray(offset, offset + step));
+      return hasher.digest();
+    }
+
+    function hexEqual(left, right) {
+      if (left.length !== right.length) return false;
+      let diff = 0;
+      for (let i = 0; i < left.length; i += 1) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
+      return diff === 0;
+    }
+
+    function firstDifference(left, right) {
+      const length = Math.min(left.length, right.length);
+      for (let i = 0; i < length; i += 1) if (left[i] !== right[i]) return i + 1;
+      return length + 1;
+    }
+
+    function canonicalAlgorithm(token) {
+      const key = token.toLowerCase().replace(/[^a-z0-9]/g, '');
+      return {
+        md5: 'MD5',
+        sha1: 'SHA-1',
+        sha224: 'SHA-224',
+        sha256: 'SHA-256',
+        sha384: 'SHA-384',
+        sha512: 'SHA-512',
+        sha512224: 'SHA-512/224',
+        sha512256: 'SHA-512/256',
+        sha3224: 'SHA3-224',
+        sha3256: 'SHA3-256',
+        sha3384: 'SHA3-384',
+        sha3512: 'SHA3-512',
+        ripemd160: 'RIPEMD-160',
+        rmd160: 'RIPEMD-160',
+        crc32: 'CRC32'
+      }[key] || null;
+    }
+
+    function algorithmsForLength(length) {
+      return ALGORITHMS.filter(item => item.bits / 4 === length);
+    }
+
+    function extractHex(line, expectedLength) {
+      const tokens = (line.replace(/0x(?=[0-9a-fA-F])/gi, '').match(/[0-9a-fA-F]+/g) || []).map(token => token.toLowerCase());
+      if (!tokens.length) return '';
+      const joined = tokens.join('');
+      if (expectedLength && joined.length === expectedLength) return joined;
+      if (!expectedLength && HASH_LENGTHS.has(joined.length)) return joined;
+      if (expectedLength) {
+        const exact = tokens.find(token => token.length === expectedLength);
+        if (exact) return exact;
+      }
+      const known = tokens.filter(token => HASH_LENGTHS.has(token.length)).sort((a, b) => b.length - a.length);
+      return known[0] || joined;
+    }
+
+    function parseExpected(raw) {
+      const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      if (!lines.length) return {entries: [], invalid: false};
+      const entries = [];
+      let invalid = false;
+      lines.forEach(line => {
+        const found = line.match(/sha-?3-?(?:224|256|384|512)|sha-?512[/-]?(?:224|256)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/i);
+        const algorithm = found ? canonicalAlgorithm(found[0]) : null;
+        const expectedLength = algorithm ? ALGORITHMS.find(item => item.id === algorithm).bits / 4 : 0;
+        const hex = extractHex(line, expectedLength);
+        if (!hex || !HASH_LENGTHS.has(hex.length)) {
+          invalid = true;
+          return;
+        }
+        entries.push({algorithm, hex, raw: line});
+      });
+      return {entries, invalid: invalid && !entries.length, partialInvalid: invalid && entries.length > 0};
+    }
+
+    function entryTargets(entry, algorithm, hex) {
+      if (entry.algorithm) return entry.algorithm === algorithm;
+      return entry.hex.length === hex.length;
+    }
+
+    function rowComparison(result) {
+      const targets = expectedEntries.filter(entry => entryTargets(entry, result.algorithm, result.hex));
+      if (!targets.length) return null;
+      const matched = targets.some(entry => hexEqual(entry.hex, result.hex));
+      return matched ? 'match' : 'mismatch';
+    }
+
+    function candidateAlgorithms() {
+      const ids = new Set();
+      expectedEntries.forEach(entry => {
+        if (entry.algorithm) ids.add(entry.algorithm);
+        else algorithmsForLength(entry.hex.length).forEach(item => ids.add(item.id));
+      });
+      return [...ids];
+    }
+
+    function missingCandidates() {
+      const selected = new Set(selectedAlgorithms());
+      const disabled = new Set(algorithmInputs.filter(input => input.disabled).map(input => input.value));
+      return candidateAlgorithms().filter(id => !selected.has(id) && !disabled.has(id));
+    }
+
+    function describeCandidates(ids) {
+      return ids.join('、');
+    }
+
+    function renderBanner(kind, title, detail) {
+      compareBanner.hidden = false;
+      compareBanner.className = `compare-banner is-${kind}`;
+      compareBanner.replaceChildren();
+      const icon = document.createElement('span');
+      icon.className = 'banner-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = kind === 'match' ? iconMarkup.check : kind === 'info' ? iconMarkup.hash : iconMarkup.error;
+      const copy = document.createElement('div');
+      copy.className = 'banner-copy';
+      const heading = document.createElement('strong');
+      heading.textContent = title;
+      const text = document.createElement('span');
+      text.textContent = detail;
+      copy.append(heading, text);
+      compareBanner.append(icon, copy);
+    }
+
+    function updateComparison() {
+      const parsed = parseExpected(expectedInput.value);
+      expectedEntries = parsed.entries;
+      expectedInvalid = parsed.invalid;
+      const missing = missingCandidates();
+      applySuggested.hidden = !expectedEntries.length || !missing.length;
+      applySuggested.textContent = selectedAlgorithms().length ? '补选可能的算法' : '选择这些算法';
+
+      if (!expectedInput.value.trim()) {
+        compareBanner.hidden = true;
+        compareHint.textContent = '计算完成后会自动比对，忽略大小写和分隔符。';
+        return;
+      }
+      if (parsed.invalid) {
+        compareHint.textContent = '未识别到有效哈希。';
+        renderBanner('invalid', '无法识别预期值', '请粘贴十六进制哈希，可以带算法名称、空格或冒号。');
+        return;
+      }
+
+      const named = [...new Set(expectedEntries.map(entry => entry.algorithm).filter(Boolean))];
+      const unnamed = expectedEntries.filter(entry => !entry.algorithm);
+      const lengthNames = [...new Set(unnamed.flatMap(entry => algorithmsForLength(entry.hex.length).map(item => item.id)))];
+      let hint = named.length ? `已识别 ${named.join('、')}` : `已识别 ${expectedEntries[0].hex.length} 位十六进制`;
+      if (!named.length && lengthNames.length) hint += `，可能是 ${lengthNames.join('、')}`;
+      if (parsed.partialInvalid) hint += '。有一行无法识别，已忽略';
+      compareHint.textContent = `${hint}。`;
+
+      if (!currentResults.length) {
+        renderBanner('info', '等待计算结果', missing.length ? `还需要计算 ${describeCandidates(missing)}。` : '点击计算后会自动比对。');
+        return;
+      }
+
+      const matched = [];
+      const mismatched = [];
+      const pending = [];
+      expectedEntries.forEach(entry => {
+        const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
+        if (!targets.length) {
+          pending.push(entry.algorithm || `${entry.hex.length} 位哈希`);
+          return;
+        }
+        const hit = targets.find(result => hexEqual(result.hex, entry.hex));
+        if (hit) matched.push(hit.algorithm);
+        else mismatched.push(entry.algorithm || targets.map(result => result.algorithm).join(' / '));
+      });
+
+      if (mismatched.length) {
+        const first = expectedEntries.find(entry => {
+          const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
+          return targets.length && !targets.some(result => hexEqual(result.hex, entry.hex));
+        });
+        const target = first && currentResults.find(result => entryTargets(first, result.algorithm, result.hex) && result.hex.length === first.hex.length);
+        const where = target ? `，与 ${target.algorithm} 从第 ${firstDifference(first.hex, target.hex)} 位开始不同` : '';
+        renderBanner('mismatch', '校验值不一致', `${mismatched.join('、')} 没有匹配${where}。`);
+        return;
+      }
+      if (pending.length && !matched.length) {
+        renderBanner('info', '还没有可比对的结果', `请计算 ${describeCandidates(missing)}。`);
+        return;
+      }
+      if (pending.length) {
+        renderBanner('info', `已匹配 ${matched.join('、')}`, `仍有预期值尚未计算：${pending.join('、')}。`);
+        return;
+      }
+      renderBanner('match', `与 ${matched.join('、')} 一致`, '预期值与本次计算结果完全相同。');
+    }
+
+    function selectedAlgorithms() {
+      return algorithmInputs.filter(input => input.checked).map(input => input.value);
+    }
+
+    function refreshAlgorithmStyles() {
+      algorithmInputs.forEach(input => input.closest('.algorithm-option').classList.toggle('is-selected', input.checked));
+      const count = selectedAlgorithms().length;
+      algorithmCount.textContent = count ? `已选 ${count} 种` : '未选择';
+    }
+
+    function setStatus(message, kind = '') {
+      statusLine.textContent = message;
+      statusLine.className = `status-line${kind ? ` is-${kind}` : ''}`;
+    }
+
+    function formatBytes(bytes) {
+      if (bytes === 0) return '0 B';
+      const units = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
+      const value = bytes / (1024 ** index);
+      return `${value.toFixed(index === 0 || value >= 10 ? 0 : 1)} ${units[index]}`;
+    }
+
+    function describeFile(file) {
+      const parts = file.name.split('.');
+      const extensionName = parts.length > 1 ? parts[parts.length - 1] : '';
+      const extension = extensionName ? extensionName.toUpperCase() : (file.type ? file.type.split('/').pop().toUpperCase() : '文件');
+      const modified = file.lastModified ? new Date(file.lastModified).toLocaleDateString('zh-CN', {year: 'numeric', month: '2-digit', day: '2-digit'}) : '';
+      return [extension, formatBytes(file.size), modified].filter(Boolean).join(' · ');
+    }
+
+    function hasExpectedValue() {
+      return expectedEntries.length > 0;
+    }
+
+    function updateComputeButton() {
+      computeButton.disabled = !selectedFile || !selectedAlgorithms().length || isCalculating;
+      computeButton.setAttribute('aria-busy', String(isCalculating));
+      computeLabel.textContent = isCalculating ? '正在计算' : (hasExpectedValue() ? '计算并比对' : '计算哈希');
+      computeIcon.hidden = isCalculating;
+      buttonSpinner.hidden = !isCalculating;
+    }
+
+    function renderMessage(title, description, kind = 'empty', progress = 0) {
+      resultsPanel.className = `results-panel${kind === 'error' ? ' is-error' : ''}`;
+      resultsPanel.replaceChildren();
+      if (kind === 'loading') {
+        const track = document.createElement('div');
+        track.className = 'loading-track';
+        track.setAttribute('aria-hidden', 'true');
+        const bar = document.createElement('span');
+        bar.style.width = `${Math.max(4, Math.round(progress * 100))}%`;
+        track.append(bar);
+        resultsPanel.append(track);
+      }
+      const state = document.createElement('div');
+      state.className = 'empty-result';
+      const icon = document.createElement('span');
+      icon.className = 'empty-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = kind === 'error' ? iconMarkup.error : kind === 'loading' ? iconMarkup.clock : iconMarkup.hash;
+      const copy = document.createElement('div');
+      copy.className = 'empty-copy';
+      const heading = document.createElement('p');
+      heading.className = 'empty-title';
+      heading.textContent = title;
+      const detail = document.createElement('p');
+      detail.className = 'empty-description';
+      detail.textContent = description;
+      copy.append(heading, detail);
+      state.append(icon, copy);
+      resultsPanel.append(state);
+      resultsPanel.setAttribute('aria-busy', String(kind === 'loading'));
+    }
+
+    function createDigestRow(result, index) {
+      const comparison = rowComparison(result);
+      const row = document.createElement('article');
+      row.className = `digest-row${comparison ? ` is-${comparison}` : ''}`;
+      row.style.animationDelay = `${index * 40}ms`;
+      const content = document.createElement('div');
+      const meta = document.createElement('div');
+      meta.className = 'digest-meta';
+      const algorithm = document.createElement('span');
+      algorithm.className = 'digest-algorithm';
+      algorithm.textContent = result.algorithm;
+      const length = document.createElement('span');
+      length.className = 'digest-length';
+      length.textContent = `${result.hex.length} 个十六进制字符`;
+      meta.append(algorithm, length);
+      if (comparison) {
+        const pill = document.createElement('span');
+        pill.className = `match-pill is-${comparison}`;
+        pill.textContent = comparison === 'match' ? '一致' : '不一致';
+        meta.append(pill);
+      }
+      const value = document.createElement('code');
+      value.className = 'digest-value';
+      value.textContent = result.hex;
+      content.append(meta, value);
+      const button = document.createElement('button');
+      button.className = 'copy-button';
+      button.type = 'button';
+      button.setAttribute('aria-label', `复制 ${result.algorithm} 摘要`);
+      const icon = document.createElement('span');
+      icon.className = 'copy-icon';
+      icon.setAttribute('aria-hidden', 'true');
+      icon.innerHTML = iconMarkup.copy;
+      button.append(icon);
+      button.addEventListener('click', () => copyText(`${result.algorithm}: ${result.hex}`, button, `已复制 ${result.algorithm}`));
+      row.append(content, button);
+      return row;
+    }
+
+    function renderResults(results) {
+      currentResults = results;
+      copyAllButton.disabled = !results.length;
+      resultsPanel.className = 'results-panel';
+      resultsPanel.replaceChildren(...results.map(createDigestRow));
+      resultsPanel.setAttribute('aria-busy', 'false');
+    }
+
+    function clearResults() {
+      currentResults = [];
+      copyAllButton.disabled = true;
+    }
+
+    function onAlgorithmsChanged() {
+      runToken += 1;
+      isCalculating = false;
+      refreshAlgorithmStyles();
+      clearResults();
+      updateComputeButton();
+      updateComparison();
+      if (!selectedFile) {
+        setStatus(selectedAlgorithms().length ? '尚未选择文件' : '请至少选择一种算法。', selectedAlgorithms().length ? '' : 'error');
+        renderMessage('还没有摘要', '选好文件并计算后，结果会显示在这里。');
+        return;
+      }
+      const ready = selectedAlgorithms().length > 0;
+      setStatus(ready ? '算法已更新，请重新计算。' : '请至少选择一种算法。', ready ? '' : 'error');
+      renderMessage('算法已更新', ready ? '再次计算以生成所选算法的摘要。' : '至少选择一种算法后才能计算。');
+    }
+
+    function setCheckedAlgorithms(ids, exclusive) {
+      const wanted = new Set(ids);
+      algorithmInputs.forEach(input => {
+        if (input.disabled) return;
+        input.checked = exclusive ? wanted.has(input.value) : input.checked || wanted.has(input.value);
+      });
+      onAlgorithmsChanged();
+    }
+
+    function setSelectedFile(file) {
+      runToken += 1;
+      isCalculating = false;
+      selectedFile = file || null;
+      fileInput.value = '';
+      clearResults();
+      updateComputeButton();
+      updateComparison();
+      if (!selectedFile) {
+        emptyFileState.hidden = false;
+        selectedFileState.hidden = true;
+        clearFileButton.hidden = true;
+        fileName.textContent = '';
+        fileMeta.textContent = '';
+        setStatus('尚未选择文件');
+        renderMessage('还没有摘要', '选好文件并计算后，结果会显示在这里。');
+        return;
+      }
+      emptyFileState.hidden = true;
+      selectedFileState.hidden = false;
+      clearFileButton.hidden = false;
+      fileName.textContent = selectedFile.name;
+      fileMeta.textContent = describeFile(selectedFile);
+      setStatus(selectedAlgorithms().length ? '文件已就绪，可以开始计算。' : '请至少选择一种算法。', selectedAlgorithms().length ? '' : 'error');
+      renderMessage('文件已就绪', hasExpectedValue() ? '计算后会立即与预期值比对。' : '点击计算后，所选摘要会显示在这里。');
+    }
+
+    function fallbackCopy(text) {
+      const textarea = document.createElement('textarea');
+      textarea.value = text;
+      textarea.setAttribute('readonly', '');
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.append(textarea);
+      textarea.select();
+      const copied = document.execCommand('copy');
+      textarea.remove();
+      if (!copied) throw new Error('Clipboard copy failed');
+    }
+
+    async function copyText(text, button, message) {
+      try {
+        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
+        else fallbackCopy(text);
+        const icon = button.querySelector('.copy-icon');
+        if (icon) icon.innerHTML = iconMarkup.check;
+        button.classList.add('is-copied');
+        setStatus(message, 'match');
+        const previous = copyTimers.get(button);
+        if (previous) clearTimeout(previous);
+        copyTimers.set(button, setTimeout(() => {
+          if (!button.isConnected) return;
+          const currentIcon = button.querySelector('.copy-icon');
+          if (currentIcon) currentIcon.innerHTML = iconMarkup.copy;
+          button.classList.remove('is-copied');
+        }, 1600));
+      } catch (error) {
+        setStatus('复制失败，请检查浏览器的剪贴板权限。', 'error');
+      }
+    }
+
+    function yieldUi() {
+      return new Promise(resolve => setTimeout(resolve, 0));
+    }
+
+    async function hashFile(file, ids, token, onProgress) {
+      const canUseSubtle = ids.every(id => WEB_CRYPTO.has(id)) && window.crypto && crypto.subtle;
+      if (canUseSubtle) {
+        const buffer = await file.arrayBuffer();
+        if (token !== runToken) return null;
+        const results = [];
+        for (let i = 0; i < ids.length; i += 1) {
+          let hex;
+          try {
+            hex = bytesToHex(new Uint8Array(await crypto.subtle.digest(ids[i], buffer)));
+          } catch (error) {
+            hex = digestBytes(ids[i], new Uint8Array(buffer));
+          }
+          results.push({algorithm: ids[i], hex});
+          onProgress((i + 1) / ids.length, ids[i]);
+          if (token !== runToken) return null;
+        }
+        return results;
+      }
+
+      const hashers = ids.map(id => ({id, hasher: createHasher(id)}));
+      const sliceSize = 512 * 1024;
+      for (let offset = 0; offset < file.size; offset += sliceSize) {
+        if (token !== runToken) return null;
+        const bytes = new Uint8Array(await file.slice(offset, offset + sliceSize).arrayBuffer());
+        hashers.forEach(item => item.hasher.update(bytes));
+        onProgress(Math.min(1, (offset + bytes.length) / Math.max(file.size, 1)));
+        await yieldUi();
+      }
+      if (token !== runToken) return null;
+      return hashers.map(item => ({algorithm: item.id, hex: item.hasher.digest()}));
+    }
+
+    async function computeHashes() {
+      if (!selectedFile || isCalculating) return;
+      const ids = selectedAlgorithms();
+      if (!ids.length) {
+        setStatus('请至少选择一种算法。', 'error');
+        return;
+      }
+      const file = selectedFile;
+      const token = ++runToken;
+      clearResults();
+      isCalculating = true;
+      updateComputeButton();
+      setStatus('正在读取文件并计算摘要…');
+      renderMessage('正在计算摘要', '大文件可能需要一点时间，请保持页面打开。', 'loading', 0.04);
+      try {
+        const results = await hashFile(file, ids, token, (progress, name) => {
+          if (token !== runToken) return;
+          const percent = Math.round(progress * 100);
+          setStatus(name ? `正在计算 ${name} · ${percent}%` : `正在读取并计算 · ${percent}%`);
+          renderMessage('正在计算摘要', name ? `当前算法 ${name}` : '文件正在分块处理。', 'loading', progress);
+        });
+        if (!results || token !== runToken) return;
+        renderResults(results);
+        updateComparison();
+        const verdict = compareBanner.querySelector('strong');
+        if (hasExpectedValue() && verdict) setStatus(verdict.textContent, compareBanner.classList.contains('is-match') ? 'match' : compareBanner.classList.contains('is-mismatch') ? 'error' : '');
+        else setStatus(`已完成 ${results.length} 种摘要计算。`, 'match');
+        if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          resultsSection.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+        }
+      } catch (error) {
+        if (token !== runToken) return;
+        renderMessage('无法计算摘要', '文件读取失败或浏览器无法处理该文件，请重新选择后再试。', 'error');
+        setStatus('计算未完成，请重试。', 'error');
+      } finally {
+        if (token === runToken) {
+          isCalculating = false;
+          updateComputeButton();
+        }
+      }
+    }
+
+    function renderAlgorithms() {
+      algorithmMount.replaceChildren();
+      ALGORITHM_GROUPS.forEach(group => {
+        const wrap = document.createElement('div');
+        const label = document.createElement('p');
+        label.className = 'algo-group-label';
+        label.textContent = group.label;
+        const list = document.createElement('div');
+        list.className = 'algorithm-list';
+        ALGORITHMS.filter(item => item.group === group.id).forEach(item => {
+          const option = document.createElement('label');
+          option.className = `algorithm-option${item.checked ? ' is-selected' : ''}`;
+          if (item.title) option.title = item.title;
+          const input = document.createElement('input');
+          input.type = 'checkbox';
+          input.name = 'algorithm';
+          input.value = item.id;
+          input.checked = Boolean(item.checked);
+          const name = document.createElement('span');
+          name.className = 'algorithm-name';
+          name.textContent = item.id;
+          option.append(input, name);
+          list.append(option);
+        });
+        wrap.append(label, list);
+        algorithmMount.append(wrap);
+      });
+      algorithmInputs = [...document.querySelectorAll('input[name="algorithm"]')];
+      algorithmInputs.forEach(input => input.addEventListener('change', onAlgorithmsChanged));
+      refreshAlgorithmStyles();
+    }
+
+    function renderSwatches() {
+      swatchList.replaceChildren();
+      ACCENTS.forEach(accent => {
+        const button = document.createElement('button');
+        button.className = 'swatch';
+        button.type = 'button';
+        button.dataset.accent = accent.id;
+        button.style.setProperty('--swatch', accent.swatch);
+        button.setAttribute('role', 'radio');
+        button.setAttribute('aria-label', accent.label);
+        button.title = accent.label;
+        button.addEventListener('click', () => setAccent(accent.id));
+        swatchList.append(button);
+      });
+      updateSwatches();
+    }
+
+    function updateSwatches() {
+      const current = document.documentElement.dataset.accent || 'violet';
+      [...swatchList.children].forEach(button => {
+        const active = button.dataset.accent === current;
+        button.classList.toggle('is-active', active);
+        button.setAttribute('aria-checked', String(active));
+      });
+    }
+
+    const BACKGROUND_COLORS = {
+      violet: ['#f7f5fa', '#141218'],
+      blue: ['#f5f7fc', '#10141a'],
+      teal: ['#f4f8f7', '#101615'],
+      green: ['#f5f8f4', '#111612'],
+      orange: ['#faf6f3', '#161310'],
+      rose: ['#faf5f7', '#161214']
+    };
+
+    function updateThemeColor() {
+      const accent = document.documentElement.dataset.accent || 'violet';
+      const dark = document.documentElement.dataset.theme === 'dark';
+      const colors = BACKGROUND_COLORS[accent] || BACKGROUND_COLORS.violet;
+      const meta = document.querySelector('meta[name="theme-color"]');
+      if (meta) meta.content = colors[dark ? 1 : 0];
+    }
+
+    function setAccent(accent) {
+      document.documentElement.dataset.accent = accent;
+      updateSwatches();
+      updateThemeColor();
+      closePalette();
+      try {localStorage.setItem('hashroom-accent', accent);} catch (error) { }
+    }
+
+    function setTheme(theme, persist = true) {
+      document.documentElement.dataset.theme = theme;
+      const dark = theme === 'dark';
+      themeToggle.setAttribute('aria-label', dark ? '切换浅色模式' : '切换深色模式');
+      themeToggle.title = dark ? '切换浅色模式' : '切换深色模式';
+      updateThemeColor();
+      if (!persist) return;
+      try {localStorage.setItem('hashroom-theme', theme);} catch (error) { }
+    }
+
+    function closePalette() {
+      paletteMenu.hidden = true;
+      paletteToggle.setAttribute('aria-expanded', 'false');
+    }
+
+    function disableAlgorithms(ids) {
+      algorithmInputs.forEach(input => {
+        if (!ids.includes(input.value)) return;
+        const option = input.closest('.algorithm-option');
+        input.checked = false;
+        input.disabled = true;
+        option.classList.add('is-disabled');
+        option.title = '自检未通过，已暂停使用';
+      });
+      refreshAlgorithmStyles();
+      updateComputeButton();
+      const names = ids.join('、');
+      setStatus(`算法自检未通过：${names}，已暂停使用。`, 'error');
+      renderMessage('算法自检未通过', `${names} 的计算结果与标准测试向量不一致，已暂停这些算法，其他算法不受影响。`, 'error');
+    }
+
+    function selfTest() {
+      const MSG56 = 'abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq';
+      const MSG112 = 'abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu';
+      const vectors = [
+        ['MD5', '', 'd41d8cd98f00b204e9800998ecf8427e'],
+        ['MD5', 'abc', '900150983cd24fb0d6963f7d28e17f72'],
+        ['SHA-1', '', 'da39a3ee5e6b4b0d3255bfef95601890afd80709'],
+        ['SHA-1', 'abc', 'a9993e364706816aba3e25717850c26c9cd0d89d'],
+        ['SHA-224', 'abc', '23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7'],
+        ['SHA-256', '', 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855'],
+        ['SHA-256', 'abc', 'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad'],
+        ['SHA-384', 'abc', 'cb00753f45a35e8bb5a03d699ac65007272c32ab0eded1631a8b605a43ff5bed8086072ba1e7cc2358baeca134c825a7'],
+        ['SHA-512', 'abc', 'ddaf35a193617abacc417349ae20413112e6fa4e89a97ea20a9eeee64b55d39a2192992a274fc1a836ba3c23a3feebbd454d4423643ce80e2a9ac94fa54ca49f'],
+        ['SHA-512/224', 'abc', '4634270f707b6a54daae7530460842e20e37ed265ceee9a43e8924aa'],
+        ['SHA-512/256', 'abc', '53048e2681941ef99b2e29b76b4c7dabe4c2d0c634fc6d46e0e2f13107e7af23'],
+        ['SHA3-224', '', '6b4e03423667dbb73b6e15454f0eb1abd4597f9a1b078e3f5b5a6bc7'],
+        ['SHA3-256', '', 'a7ffc6f8bf1ed76651c14756a061d662f580ff4de43b49fa82d80a4b80f8434a'],
+        ['SHA3-256', 'abc', '3a985da74fe225b2045c172d6bd390bd855f086e3e9d525b46bfe24511431532'],
+        ['SHA3-384', '', '0c63a75b845e4f7d01107d852e4c2485c51a50aaaa94fc61995e71bbee983a2ac3713831264adb47fb6bd1e058d5f004'],
+        ['SHA3-512', '', 'a69f73cca23a9ac5c8b567dc185a756e97c982164fe25859e0d1dcc1475c80a615b2123af1f5f94c11e3e9402c3ac558f500199d95b6d3e301758586281dcd26'],
+        ['RIPEMD-160', '', '9c1185a5c5e9fc54612808977ee8f548b2258d31'],
+        ['RIPEMD-160', 'abc', '8eb208f7e05d987a9b044a8e98c6b087f15a0bfc'],
+        ['CRC32', '', '00000000'],
+        ['CRC32', '123456789', 'cbf43926'],
+        ['MD5', MSG56, '8215ef0796a20bcaaae116d3876c664a'],
+        ['SHA-1', MSG56, '84983e441c3bd26ebaae4aa1f95129e5e54670f1'],
+        ['SHA-224', MSG56, '75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525'],
+        ['SHA-256', MSG56, '248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1'],
+        ['SHA-384', MSG56, '3391fdddfc8dc7393707a65b1b4709397cf8b1d162af05abfe8f450de5f36bc6b0455a8520bc4e6f5fe95b1fe3c8452b'],
+        ['SHA-512', MSG56, '204a8fc6dda82f0a0ced7beb8e08a41657c16ef468b228a8279be331a703c33596fd15c13b1b07f9aa1d3bea57789ca031ad85c7a71dd70354ec631238ca3445'],
+        ['SHA3-224', MSG56, '8a24108b154ada21c9fd5574494479ba5c7e7ab76ef264ead0fcce33'],
+        ['SHA3-256', MSG56, '41c0dba2a9d6240849100376a8235e2c82e1b9998a999e21db32dd97496d3376'],
+        ['SHA3-384', MSG56, '991c665755eb3a4b6bbdfb75c78a492e8c56a22c5c4d7e429bfdbc32b9d4ad5aa04a1f076e62fea19eef51acd0657c22'],
+        ['SHA3-512', MSG56, '04a371e84ecfb5b8b77cb48610fca8182dd457ce6f326a0fd3d7ec2f1e91636dee691fbe0c985302ba1b0d8dc78c086346b533b49c030d99a27daf1139d6e75e'],
+        ['RIPEMD-160', MSG56, '12a053384a9c0c88e405a06c27dcf49ada62eb2b'],
+        ['SHA-1', MSG112, 'a49b2446a02c645bf419f995b67091253a04a259'],
+        ['SHA-224', MSG112, 'c97ca9a559850ce97a04a96def6d99a9e0e0e2ab14e6b8df265fc0b3'],
+        ['SHA-256', MSG112, 'cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1'],
+        ['SHA-384', MSG112, '09330c33f71147e83d192fc782cd1b4753111b173b3b05d22fa08086e3b0f712fcc7c71a557e2db966c3e9fa91746039'],
+        ['SHA-512', MSG112, '8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa17299aeadb6889018501d289e4900f7e4331b99dec4b5433ac7d329eeb6dd26545e96e55b874be909'],
+        ['SHA3-224', MSG112, '543e6868e1666c1a643630df77367ae5a62a85070a51c14cbf665cbc'],
+        ['SHA3-256', MSG112, '916f6061fe879741ca6469b43971dfdb28b1a32dc36cb3254e812be27aad1d18'],
+        ['SHA3-384', MSG112, '79407d3b5916b59c3e30b09822974791c313fb9ecc849e406f23592d04f625dc8c709b98b43b3852b337216179aa7fc7'],
+        ['SHA3-512', MSG112, 'afebb2ef542e6579c50cad06d2e578f9f8dd6881d7dc824d26360feebf18a4fa73e3261122948efcfd492e74e82e2189ed0fb440d187f382270cb455f21dd185']
+      ];
+      const failed = new Set();
+      vectors.forEach(([id, text, expected]) => {
+        const actual = digestBytes(id, new TextEncoder().encode(text));
+        if (actual !== expected) failed.add(id);
+      });
+      const sample = new TextEncoder().encode(MSG112 + MSG56);
+      ALGORITHMS.forEach(item => {
+        const whole = digestBytes(item.id, sample);
+        const hasher = createHasher(item.id);
+        for (let offset = 0; offset < sample.length; offset += 7) hasher.update(sample.subarray(offset, offset + 7));
+        if (hasher.digest() !== whole) failed.add(item.id);
+      });
+      if (failed.size) disableAlgorithms([...failed]);
+      else setStatus('算法自检通过', 'match');
+    }
+
+    renderAlgorithms();
+    renderSwatches();
+    renderMessage('还没有摘要', '选好文件并计算后，结果会显示在这里。');
+    setTheme(document.documentElement.dataset.theme || 'light', false);
+
+    dropzone.addEventListener('click', () => fileInput.click());
+    fileInput.addEventListener('change', event => {
+      if (event.target.files && event.target.files.length) setSelectedFile(event.target.files[0]);
+    });
+    ['dragenter', 'dragover'].forEach(type => dropzone.addEventListener(type, event => {
+      event.preventDefault();
+      dropzone.classList.add('is-dragging');
+    }));
+    dropzone.addEventListener('dragleave', event => {
+      if (!dropzone.contains(event.relatedTarget)) dropzone.classList.remove('is-dragging');
+    });
+    dropzone.addEventListener('drop', event => {
+      event.preventDefault();
+      dropzone.classList.remove('is-dragging');
+      if (event.dataTransfer && event.dataTransfer.files.length) setSelectedFile(event.dataTransfer.files[0]);
+    });
+    clearFileButton.addEventListener('click', () => setSelectedFile(null));
+    computeButton.addEventListener('click', computeHashes);
+    document.getElementById('selectCommon').addEventListener('click', () => {
+      setCheckedAlgorithms(ALGORITHMS.filter(item => item.group === 'common').map(item => item.id), true);
+    });
+    document.getElementById('selectAll').addEventListener('click', () => setCheckedAlgorithms(ALGORITHMS.map(item => item.id), true));
+    expectedInput.addEventListener('input', () => {
+      updateComparison();
+      updateComputeButton();
+      if (currentResults.length) renderResults(currentResults);
+    });
+    clearExpected.addEventListener('click', () => {
+      expectedInput.value = '';
+      updateComparison();
+      updateComputeButton();
+      if (currentResults.length) renderResults(currentResults);
+      expectedInput.focus();
+    });
+    applySuggested.addEventListener('click', () => setCheckedAlgorithms(candidateAlgorithms(), false));
+    copyAllButton.addEventListener('click', () => {
+      if (!currentResults.length) return;
+      copyText(currentResults.map(result => `${result.algorithm}: ${result.hex}`).join('\n'), copyAllButton, '已复制全部摘要');
+    });
+    paletteToggle.addEventListener('click', () => {
+      const open = paletteMenu.hidden;
+      paletteMenu.hidden = !open;
+      paletteToggle.setAttribute('aria-expanded', String(open));
+    });
+    document.addEventListener('click', event => {
+      if (!paletteMenu.hidden && !paletteToggle.contains(event.target) && !paletteMenu.contains(event.target)) closePalette();
+    });
+    document.addEventListener('keydown', event => {
+      if (event.key === 'Escape') closePalette();
+    });
+    themeToggle.addEventListener('click', () => {
+      setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    });
+    selfTest();
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+</body>
+
+</html>
