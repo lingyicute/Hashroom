@@ -142,7 +142,11 @@ async function main() {
     ['Hash: d41d8cd9 8f00b204 e9800998 ecf8427e', null, 32],
     ['Checksum: d41d8cd9 8f00b204 e9800998 ecf8427e', null, 32],
     ['d41d8cd9 8f00b204 e9800998 ecf8427e  a.txt', null, 32],
-    [`Checksum: ${spaced}`, null, 64]
+    [`Checksum: ${spaced}`, null, 64],
+    [`--sha256 ${sha256}`, 'SHA-256', 64],
+    [`SHA-256：${sha256}`, 'SHA-256', 64],
+    [`SHA-256：${sha256.match(/.{8}/g).join('，')}`, 'SHA-256', 64],
+    [`${sha256}  my-sha256.txt`, null, 64]
   ];
   cases.forEach(([line, algorithm, length]) => {
     const parsed = parseExpected(line);
