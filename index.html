@@ -2957,6 +2957,8 @@
       for (let offset = 0; offset < file.size; offset += sliceSize) {
         if (token !== runToken) return null;
         const bytes = await next;
+        // 等待读取期间可能已经取消：不再预读下一块，也不再白白计算这一块。
+        if (token !== runToken) return null;
         next = offset + sliceSize < file.size ? readSlice(offset + sliceSize) : null;
         // 同时选了很多算法时，一块数据要算很久，每个算法之后都检查一次是否该让出线程。
         for (const item of hashers) {
