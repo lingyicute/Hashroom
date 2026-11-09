@@ -21,6 +21,7 @@ const code = [
   'const HASH_LENGTHS = new Set(ALGORITHMS.map(item => item.bits / 4));',
   'let runToken = 1; const window = globalThis;',
   cut('function rotr32', 'function hexEqual'),
+  'globalThis.__writeBitLength = writeBitLength;',
   cut('function canonicalAlgorithm', 'function entryTargets'),
   cut('function yieldUi', 'async function computeHashes'),
   'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected};'
@@ -41,7 +42,24 @@ function expected(id, buf) {
   return crypto.createHash(NODE_NAMES[id]).update(buf).digest('hex');
 }
 
+function checkBitLength() {
+  const write = globalThis.__writeBitLength;
+  const sizes = [0, 1, 55, 2 ** 29 - 1, 2 ** 29, 2 ** 32, 2 ** 32 + 5, 2 ** 40 + 12345, 2 ** 50 + 7, Number.MAX_SAFE_INTEGER];
+  for (const size of sizes) {
+    for (const [width, little] of [[8, false], [8, true], [16, false]]) {
+      const buf = new Uint8Array(16);
+      write(buf, 0, size, width, little);
+      const bytes = Array.from(buf.subarray(0, width));
+      if (little) bytes.reverse();
+      const got = bytes.reduce((acc, byte) => (acc << 8n) | BigInt(byte), 0n);
+      assert.strictEqual(got, BigInt(size) * 8n, `长度编码错误 (${size} 字节, ${width} 字节宽, ${little ? 'LE' : 'BE'})`);
+    }
+  }
+  console.log('ok    bit length');
+}
+
 async function main() {
+  checkBitLength();
   const hasCrc = typeof require('zlib').crc32 === 'function';
   const sizes = [];
   for (let i = 0; i <= 300; i += 1) sizes.push(i);
