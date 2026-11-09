@@ -2150,30 +2150,45 @@
       }
     }
 
+    // 切片查表（slicing-by-8）：CRC_TABLE 依次存放 8 张 256 项的表，第 k 张表等于把一个字节再往后推进 k 个字节，
+    // 每轮一次处理 8 个字节，比逐字节查表快一倍左右。值存在 Int32Array 里，运算全程停留在 32 位整数上。
     const CRC_TABLE = (() => {
-      const table = new Uint32Array(256);
+      const table = new Int32Array(256 * 8);
       for (let i = 0; i < 256; i += 1) {
         let c = i;
         for (let bit = 0; bit < 8; bit += 1) c = (c & 1) ? (0xedb88320 ^ (c >>> 1)) : (c >>> 1);
-        table[i] = c >>> 0;
+        table[i] = c;
+      }
+      for (let i = 256; i < table.length; i += 1) {
+        const previous = table[i - 256];
+        table[i] = table[previous & 255] ^ (previous >>> 8);
       }
       return table;
     })();
 
     class Crc32 {
       constructor() {
-        this.crc = 0xffffffff;
+        this.crc = -1;
       }
 
       update(data) {
+        const table = CRC_TABLE;
+        const length = data.length;
         let c = this.crc;
-        for (let i = 0; i < data.length; i += 1) c = (CRC_TABLE[(c ^ data[i]) & 255] ^ (c >>> 8)) >>> 0;
+        let i = 0;
+        for (; i + 8 <= length; i += 8) {
+          const word = c ^ (data[i] | (data[i + 1] << 8) | (data[i + 2] << 16) | (data[i + 3] << 24));
+          c = table[1792 + (word & 255)] ^ table[1536 + ((word >>> 8) & 255)] ^
+            table[1280 + ((word >>> 16) & 255)] ^ table[1024 + (word >>> 24)] ^
+            table[768 + data[i + 4]] ^ table[512 + data[i + 5]] ^ table[256 + data[i + 6]] ^ table[data[i + 7]];
+        }
+        for (; i < length; i += 1) c = table[(c ^ data[i]) & 255] ^ (c >>> 8);
         this.crc = c;
         return this;
       }
 
       digest() {
-        return ((this.crc ^ 0xffffffff) >>> 0).toString(16).padStart(8, '0');
+        return (~this.crc >>> 0).toString(16).padStart(8, '0');
       }
     }
 
