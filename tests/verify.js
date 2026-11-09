@@ -26,10 +26,10 @@ const code = [
   'globalThis.__writeBitLength = writeBitLength;',
   cut('function canonicalAlgorithm', 'function entryTargets'),
   cut('const yieldQueue', 'async function computeHashes'),
-  'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected};'
+  'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile};'
 ].join('\n');
 
-const {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected} =
+const {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile} =
   new Function('crypto', 'performance', code)(crypto.webcrypto, performance);
 
 const NODE_NAMES = {
@@ -194,6 +194,19 @@ async function main() {
   assert.strictEqual(mixed.entries.length, 1);
   assert.strictEqual(mixed.partialInvalid, true);
   assert.strictEqual(mixed.invalidLines, 2);
+  // 整份校验清单：只比对写明了当前文件名的那一行，其他文件的行不参与。
+  const list = parseExpected([
+    `${sha256}  ubuntu.iso`,
+    'd41d8cd98f00b204e9800998ecf8427e  ./sub/other.iso',
+    `SHA256 (win.iso) = ${sha256}`,
+    `${sha256} *C:\\dl\\x.bin`,
+    `SHA-256: ${sha256}`
+  ].join('\n'));
+  assert.deepStrictEqual(list.entries.map(entry => entry.file), ['ubuntu.iso', 'other.iso', 'win.iso', 'x.bin', '']);
+  assert.strictEqual(entriesForFile(list.entries, 'other.iso').entries.length, 2);
+  assert.strictEqual(entriesForFile(list.entries, 'other.iso').ignored, 3);
+  assert.strictEqual(entriesForFile(list.entries, 'missing.iso').ignored, 0);
+  assert.strictEqual(entriesForFile(list.entries, '').entries.length, 5);
   console.log('ok    parseExpected');
 }
 
