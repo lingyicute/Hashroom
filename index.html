@@ -2490,10 +2490,16 @@
       return ids.join('、');
     }
 
+    // Element.replaceChildren() 要到 Safari 14、Chrome 86 才有，旧浏览器里调用会让整个界面渲染失败。
+    function replaceChildren(element, ...nodes) {
+      element.textContent = '';
+      element.append(...nodes);
+    }
+
     function renderBanner(kind, title, detail) {
       compareBanner.hidden = false;
       compareBanner.className = `compare-banner is-${kind}`;
-      compareBanner.replaceChildren();
+      replaceChildren(compareBanner);
       const icon = document.createElement('span');
       icon.className = 'banner-icon';
       icon.setAttribute('aria-hidden', 'true');
@@ -2673,7 +2679,7 @@
 
     function renderMessage(title, description, kind = 'empty', progress = 0) {
       resultsPanel.className = `results-panel${kind === 'error' ? ' is-error' : ''}`;
-      resultsPanel.replaceChildren();
+      replaceChildren(resultsPanel);
       if (kind === 'loading') {
         const track = document.createElement('div');
         track.className = 'loading-track';
@@ -2759,7 +2765,7 @@
       currentResults = results;
       copyAllButton.disabled = !results.length;
       resultsPanel.className = 'results-panel';
-      resultsPanel.replaceChildren(...results.map((result, index) => createDigestRow(result, index, animate)));
+      replaceChildren(resultsPanel, ...results.map((result, index) => createDigestRow(result, index, animate)));
       resultsPanel.setAttribute('aria-busy', 'false');
     }
 
@@ -3078,7 +3084,7 @@
     }
 
     function renderAlgorithms() {
-      algorithmMount.replaceChildren();
+      replaceChildren(algorithmMount);
       ALGORITHM_GROUPS.forEach(group => {
         const wrap = document.createElement('div');
         const label = document.createElement('p');
@@ -3110,7 +3116,7 @@
     }
 
     function renderSwatches() {
-      swatchList.replaceChildren();
+      replaceChildren(swatchList);
       ACCENTS.forEach(accent => {
         const button = document.createElement('button');
         button.className = 'swatch';
