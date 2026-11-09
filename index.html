@@ -2848,6 +2848,7 @@
         const active = button.dataset.accent === current;
         button.classList.toggle('is-active', active);
         button.setAttribute('aria-checked', String(active));
+        button.tabIndex = active ? 0 : -1;
       });
     }
 
@@ -2868,11 +2869,11 @@
       if (meta) meta.content = colors[dark ? 1 : 0];
     }
 
-    function setAccent(accent) {
+    function setAccent(accent, keepOpen = false) {
       document.documentElement.dataset.accent = accent;
       updateSwatches();
       updateThemeColor();
-      closePalette();
+      if (!keepOpen) closePalette();
       try {localStorage.setItem('hashroom-accent', accent);} catch (error) { }
     }
 
@@ -3048,6 +3049,18 @@
     copyAllButton.addEventListener('click', () => {
       if (!currentResults.length) return;
       copyText(currentResults.map(result => `${result.algorithm}: ${result.hex}`).join('\n'), copyAllButton, '已复制全部摘要');
+    });
+    // 单选组用方向键切换，选中的那个色块才在 Tab 顺序里。
+    swatchList.addEventListener('keydown', event => {
+      const step = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[event.key];
+      if (!step) return;
+      const buttons = [...swatchList.children];
+      const index = buttons.indexOf(document.activeElement);
+      if (index < 0) return;
+      event.preventDefault();
+      const next = buttons[(index + step + buttons.length) % buttons.length];
+      setAccent(next.dataset.accent, true);
+      next.focus();
     });
     paletteToggle.addEventListener('click', () => {
       const open = paletteMenu.hidden;
