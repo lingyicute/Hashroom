@@ -2993,10 +2993,11 @@
       if (hasFiles(event)) event.preventDefault();
     });
     window.addEventListener('drop', event => {
-      if (!hasFiles(event)) return;
+      // 拖放区自己的处理函数已经调用过 preventDefault，这里只接管落在页面其他位置的文件。
+      if (!hasFiles(event) || event.defaultPrevented) return;
       event.preventDefault();
       dropzone.classList.remove('is-dragging');
-      if (!dropzone.contains(event.target)) acceptDrop(event);
+      acceptDrop(event);
     });
     clearFileButton.addEventListener('click', () => {
       setSelectedFile(null);
