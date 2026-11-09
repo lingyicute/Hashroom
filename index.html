@@ -2917,6 +2917,7 @@
       if (event.target.files && event.target.files.length) setSelectedFile(event.target.files[0]);
     });
     ['dragenter', 'dragover'].forEach(type => dropzone.addEventListener(type, event => {
+      if (!hasFiles(event)) return;
       event.preventDefault();
       dropzone.classList.add('is-dragging');
     }));
