@@ -2540,6 +2540,14 @@
       const matched = [];
       const mismatched = [];
       const pending = [];
+      // 与每一行的判定保持一致：某个结果只要被任意一条预期值命中就算一致，同一算法其余没命中的条目
+      // （如文件被浏览器改名后，整份清单里其他文件的行）不再让横幅和状态栏报“不一致”。
+      const verdicts = new Map(currentResults.map(result => [result, rowComparison(result)]));
+      const unmatchedTargets = entry => {
+        const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
+        if (targets.some(result => hexEqual(result.hex, entry.hex))) return [];
+        return targets.filter(result => verdicts.get(result) === 'mismatch');
+      };
       expectedEntries.forEach(entry => {
         const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
         if (!targets.length) {
@@ -2548,20 +2556,18 @@
           return;
         }
         const hit = targets.find(result => hexEqual(result.hex, entry.hex));
-        const mismatchLabel = entry.algorithm || targets.map(result => result.algorithm).join(' / ');
         if (hit) {
           if (!matched.includes(hit.algorithm)) matched.push(hit.algorithm);
-        } else if (!mismatched.includes(mismatchLabel)) {
-          mismatched.push(mismatchLabel);
+          return;
         }
+        const missed = unmatchedTargets(entry);
+        const mismatchLabel = entry.algorithm || missed.map(result => result.algorithm).join(' / ');
+        if (missed.length && !mismatched.includes(mismatchLabel)) mismatched.push(mismatchLabel);
       });
 
       if (mismatched.length) {
-        const first = expectedEntries.find(entry => {
-          const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
-          return targets.length && !targets.some(result => hexEqual(result.hex, entry.hex));
-        });
-        const target = first && currentResults.find(result => entryTargets(first, result.algorithm, result.hex) && result.hex.length === first.hex.length);
+        const first = expectedEntries.find(entry => unmatchedTargets(entry).length);
+        const target = unmatchedTargets(first).find(result => result.hex.length === first.hex.length);
         const where = target ? `，与 ${target.algorithm} 从第 ${firstDifference(first.hex, target.hex)} 位开始不同` : '';
         renderBanner('mismatch', '校验值不一致', `${mismatched.join('、')} 没有匹配${where}。`);
         return;
