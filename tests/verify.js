@@ -146,7 +146,9 @@ async function main() {
     [`--sha256 ${sha256}`, 'SHA-256', 64],
     [`SHA-256：${sha256}`, 'SHA-256', 64],
     [`SHA-256：${sha256.match(/.{8}/g).join('，')}`, 'SHA-256', 64],
-    [`${sha256}  my-sha256.txt`, null, 64]
+    [`${sha256}  my-sha256.txt`, null, 64],
+    ['da39a3ee5e6b4b0d3255bfef95601890afd80709  sha256-notes.txt', null, 40],
+    ['SHA-256: da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 40]
   ];
   cases.forEach(([line, algorithm, length]) => {
     const parsed = parseExpected(line);
