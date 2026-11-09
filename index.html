@@ -2753,12 +2753,16 @@
         if (token !== runToken) return null;
         const bytes = await next;
         next = offset + sliceSize < file.size ? readSlice(offset + sliceSize) : null;
-        hashers.forEach(item => item.hasher.update(bytes));
-        onProgress(Math.min(1, (offset + bytes.length) / Math.max(file.size, 1)));
-        if (performance.now() - lastYield > 30) {
-          await yieldUi();
-          lastYield = performance.now();
+        // 同时选了很多算法时，一块数据要算很久，每个算法之后都检查一次是否该让出线程。
+        for (const item of hashers) {
+          item.hasher.update(bytes);
+          if (performance.now() - lastYield > 30) {
+            await yieldUi();
+            lastYield = performance.now();
+            if (token !== runToken) return null;
+          }
         }
+        onProgress(Math.min(1, (offset + bytes.length) / Math.max(file.size, 1)));
       }
       if (token !== runToken) return null;
       return hashers.map(item => ({algorithm: item.id, hex: item.hasher.digest()}));
