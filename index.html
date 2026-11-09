@@ -2841,10 +2841,16 @@
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.setAttribute('readonly', '');
+      // 固定在视口左上角，聚焦时页面不会跳到底部；12pt 字号避免 iOS 聚焦时缩放页面。
       textarea.style.position = 'fixed';
+      textarea.style.top = '0';
+      textarea.style.left = '0';
+      textarea.style.fontSize = '12pt';
       textarea.style.opacity = '0';
       document.body.append(textarea);
       textarea.select();
+      // iOS Safari 的 select() 选不中只读文本框里的内容，需要再显式设置一次选区。
+      textarea.setSelectionRange(0, text.length);
       const copied = document.execCommand('copy');
       textarea.remove();
       if (active && typeof active.focus === 'function') active.focus({preventScroll: true});
