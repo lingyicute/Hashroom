@@ -2243,6 +2243,7 @@
       if (!lines.length) return {entries: [], invalid: false};
       const entries = [];
       let invalidLines = 0;
+      let strayLength = 0;
       lines.forEach(line => {
         let algorithm = null;
         let hex = '';
@@ -2265,11 +2266,13 @@
         if (!algorithm) hex = extractHex(line, 0);
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
           invalidLines += 1;
+          // 记下最长的一段十六进制，复制不完整的哈希可以据此给出提示。
+          (line.match(/[0-9a-f]+/gi) || []).forEach(run => { strayLength = Math.max(strayLength, run.length); });
           return;
         }
         entries.push({algorithm, hex, raw: line});
       });
-      return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines};
+      return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines, strayLength};
     }
 
     function entryTargets(entry, algorithm, hex) {
@@ -2340,6 +2343,13 @@
         return;
       }
       if (parsed.invalid) {
+        // 长度只差几位多半是复制不完整，直接告诉用户读到了多少位。
+        if (parsed.strayLength > 8) {
+          const lengths = [...HASH_LENGTHS].sort((a, b) => a - b).join('、');
+          compareHint.textContent = `识别到 ${parsed.strayLength} 位十六进制，不是支持的摘要长度。`;
+          renderBanner('invalid', '哈希长度不对', `支持的长度为 ${lengths} 位，请检查是否复制完整。`);
+          return;
+        }
         compareHint.textContent = '未识别到有效哈希。';
         renderBanner('invalid', '无法识别预期值', '请粘贴十六进制哈希，可以带算法名称、空格或冒号。');
         return;

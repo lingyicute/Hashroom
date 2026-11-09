@@ -171,6 +171,10 @@ async function main() {
   }
   assert.strictEqual(parseExpected('sha384 ' + sha256).entries[0].hex, sha256);
   assert.strictEqual(parseExpected('garbage').invalid, true);
+  const truncated = parseExpected(`SHA-256: ${sha256.slice(1)}`);
+  assert.strictEqual(truncated.invalid, true);
+  assert.strictEqual(truncated.strayLength, 63);
+  assert.ok(parseExpected('garbage').strayLength <= 8);
   const mixed = parseExpected(`SHA256 hash of file.iso:\n${sha256}\nCertUtil: -hashfile command completed successfully.`);
   assert.strictEqual(mixed.entries.length, 1);
   assert.strictEqual(mixed.partialInvalid, true);
