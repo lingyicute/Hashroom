@@ -60,8 +60,21 @@ function checkBitLength() {
   console.log('ok    bit length');
 }
 
+// 启动自检用的标准向量本身必须正确，否则浏览器里会误停用算法。
+function checkSelfTestVectors() {
+  const vectors = new Function(`${cut('const MSG56 =', 'const failed = new Set()')}\nreturn vectors;`)();
+  const hasCrc = typeof require('zlib').crc32 === 'function';
+  const text = new TextEncoder();
+  vectors.forEach(([id, message, want]) => {
+    if (id === 'CRC32' && !hasCrc) return;
+    assert.strictEqual(want, expected(id, Buffer.from(text.encode(message))), `自检向量有误：${id} "${message.slice(0, 12)}"`);
+  });
+  console.log('ok    self-test vectors', vectors.length);
+}
+
 async function main() {
   checkBitLength();
+  checkSelfTestVectors();
   const hasCrc = typeof require('zlib').crc32 === 'function';
   const sizes = [];
   for (let i = 0; i <= 300; i += 1) sizes.push(i);
