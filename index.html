@@ -2588,9 +2588,10 @@
     }
 
     function updateComputeButton() {
-      computeButton.disabled = !selectedFile || !selectedAlgorithms().length || isCalculating;
+      // 计算中按钮变成“取消计算”，大文件不必等到算完或者靠改选项才能中止。
+      computeButton.disabled = !isCalculating && (!selectedFile || !selectedAlgorithms().length);
       computeButton.setAttribute('aria-busy', String(isCalculating));
-      computeLabel.textContent = isCalculating ? '正在计算' : (hasExpectedValue() ? '计算并比对' : '计算哈希');
+      computeLabel.textContent = isCalculating ? '取消计算' : (hasExpectedValue() ? '计算并比对' : '计算哈希');
       computeIcon.hidden = isCalculating;
       buttonSpinner.hidden = !isCalculating;
     }
@@ -2913,8 +2914,20 @@
       }
     }
 
+    function cancelCalculation() {
+      runToken += 1;
+      isCalculating = false;
+      updateComputeButton();
+      setStatus('已取消计算。');
+      renderMessage('已取消计算', '点击计算可以重新开始。');
+    }
+
     async function computeHashes() {
-      if (!selectedFile || isCalculating) return;
+      if (isCalculating) {
+        cancelCalculation();
+        return;
+      }
+      if (!selectedFile) return;
       const ids = selectedAlgorithms();
       if (!ids.length) {
         setStatus('请至少选择一种算法。', 'error');
