@@ -2263,6 +2263,9 @@
             break;
           }
         }
+        // 名字对应的长度与读到的哈希不符（如 sha1sum 输出里的文件名 sha256-notes.txt，或标签写错），
+        // 这个名字就不是算法标记，改按长度判断，免得给哈希贴上错误的算法。
+        if (algorithm && hex.length !== ALGORITHMS.find(item => item.id === algorithm).bits / 4) algorithm = null;
         if (!algorithm) hex = extractHex(line, 0);
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
           invalidLines += 1;
