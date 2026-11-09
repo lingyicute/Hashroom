@@ -2177,7 +2177,7 @@
       const found = [...text.matchAll(/[0-9a-fA-F]+/g)];
       const tokens = found.map(item => item[0].toLowerCase());
       // 两个片段之间只隔着空白或常见分隔符时才算同一个哈希的相邻分组。
-      const adjacent = i => /^[\s:.\-_,]+$/.test(text.slice(found[i].index + found[i][0].length, found[i + 1].index));
+      const adjacent = i => /^[\s:.\-_,，：]+$/.test(text.slice(found[i].index + found[i][0].length, found[i + 1].index));
       let best = '';
       let bestExact = false;
       let bestScore = -1;
@@ -2202,11 +2202,16 @@
 
     const NAME_PATTERN = /sha-?(?:2-?)?512[/-]?(?:224|256)|sha-?[23]-?(?:224|256|384|512)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/gi;
 
-    // 紧跟在字母、数字、点、斜杠或连字符之后的名字多半是文件名的一部分（如 app.md5），
+    // 紧跟在字母、数字、点或斜杠之后的名字多半是文件名的一部分（如 app.md5），
     // 后面直接接扩展名的名字同理（如 sha256.txt），都不当作算法标记。
     function findAlgorithmNames(line) {
       return [...line.matchAll(NAME_PATTERN)].filter(found => {
-        if (found.index > 0 && /[a-z0-9._/\\-]/i.test(line[found.index - 1])) return false;
+        if (found.index > 0) {
+          const before = line[found.index - 1];
+          if (/[a-z0-9._/\\]/i.test(before)) return false;
+          // 紧贴单个连字符的名字多半是文件名的一部分（如 app-md5.iso），但命令行选项（--sha256）不是。
+          if (before === '-' && found.index > 1 && /[a-z0-9._/\\]/i.test(line[found.index - 2])) return false;
+        }
         return !/^\.[a-z0-9]/i.test(line.slice(found.index + found[0].length));
       });
     }
