@@ -123,6 +123,22 @@ async function main() {
     assert.strictEqual(parsed.entries[0].algorithm, algorithm, line);
     assert.strictEqual(parsed.entries[0].hex.length, length, line);
   });
+  // Base64 摘要：SRI、带算法名的行，含无填充和 URL 安全字母表。
+  for (const [name, id, node] of [['sha256', 'SHA-256', 'sha256'], ['sha384', 'SHA-384', 'sha384'], ['sha512', 'SHA-512', 'sha512'], ['sha1', 'SHA-1', 'sha1'], ['md5', 'MD5', 'md5']]) {
+    for (const data of ['', 'abc', 'hashroom']) {
+      const digest = crypto.createHash(node).update(data).digest();
+      const forms = [digest.toString('base64'), digest.toString('base64').replace(/=+$/, ''), digest.toString('base64url')];
+      forms.forEach(b64 => {
+        [`${name}-${b64}`, `${name.toUpperCase()}: ${b64}`, `${name}sum ${b64}  file.bin`].forEach(line => {
+          const parsed = parseExpected(line);
+          assert.strictEqual(parsed.entries.length, 1, line);
+          assert.strictEqual(parsed.entries[0].algorithm, id, line);
+          assert.strictEqual(parsed.entries[0].hex, digest.toString('hex'), line);
+        });
+      });
+    }
+  }
+  assert.strictEqual(parseExpected('sha384 ' + sha256).entries[0].hex, sha256);
   assert.strictEqual(parseExpected('garbage').invalid, true);
   const mixed = parseExpected(`SHA256 hash of file.iso:\n${sha256}\nCertUtil: -hashfile command completed successfully.`);
   assert.strictEqual(mixed.entries.length, 1);

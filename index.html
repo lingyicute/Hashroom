@@ -2205,6 +2205,28 @@
       });
     }
 
+    // SRI（sha256-…）和 openssl、coreutils 的 --base64 输出使用 Base64 编码的摘要，这里转成十六进制。
+    function extractBase64(text, byteLength) {
+      const padded = Math.ceil(byteLength / 3) * 4;
+      const unpadded = Math.ceil(byteLength * 4 / 3);
+      for (const token of text.match(/[A-Za-z0-9+/_=-]+/g) || []) {
+        for (const candidate of new Set([token, token.replace(/^[-=]+/, '')])) {
+          const body = candidate.replace(/=+$/, '');
+          if (candidate.length !== padded && candidate.length !== unpadded) continue;
+          if (body.length !== unpadded || /^[0-9a-f]+$/i.test(body) || /[^A-Za-z0-9+/_-]/.test(body)) continue;
+          if (candidate.length !== body.length && candidate.length !== padded) continue;
+          try {
+            const raw = atob(body.replace(/-/g, '+').replace(/_/g, '/').padEnd(padded, '='));
+            if (raw.length !== byteLength) continue;
+            return bytesToHex(Uint8Array.from(raw, char => char.charCodeAt(0)));
+          } catch (error) {
+            // 不是合法的 Base64，继续找下一个片段。
+          }
+        }
+      }
+      return '';
+    }
+
     function parseExpected(raw) {
       const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
       if (!lines.length) return {entries: [], invalid: false};
@@ -2216,7 +2238,9 @@
         for (const found of findAlgorithmNames(line)) {
           const id = canonicalAlgorithm(found[0]);
           const length = ALGORITHMS.find(item => item.id === id).bits / 4;
-          const value = extractHex(`${line.slice(0, found.index)} ${line.slice(found.index + found[0].length)}`, length);
+          const rest = `${line.slice(0, found.index)} ${line.slice(found.index + found[0].length)}`;
+          let value = extractHex(rest, length);
+          if (value.length !== length && id !== 'CRC32') value = extractBase64(rest, length / 2) || value;
           if (!algorithm) {
             algorithm = id;
             hex = value;
