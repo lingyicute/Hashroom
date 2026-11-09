@@ -1361,7 +1361,7 @@
             <span>复制全部</span>
           </button>
         </div>
-        <div class="results-panel" id="resultsPanel" aria-live="polite"></div>
+        <div class="results-panel" id="resultsPanel"></div>
       </section>
 
       <footer class="privacy-note">
@@ -2430,6 +2430,18 @@
       resultsPanel.setAttribute('aria-busy', String(kind === 'loading'));
     }
 
+    // 进度更新只改已有的进度条和文字，避免整块重建导致宽度过渡失效。
+    function showProgress(description, progress) {
+      const bar = resultsPanel.querySelector('.loading-track span');
+      const detail = resultsPanel.querySelector('.empty-description');
+      if (!bar || !detail) {
+        renderMessage('正在计算摘要', description, 'loading', progress);
+        return;
+      }
+      bar.style.width = `${Math.max(4, Math.round(progress * 100))}%`;
+      detail.textContent = description;
+    }
+
     function createDigestRow(result, index, animate) {
       const comparison = rowComparison(result);
       const row = document.createElement('article');
@@ -2667,7 +2679,7 @@
           lastPaint = now;
           const percent = Math.round(progress * 100);
           setStatus(name ? `正在计算 ${name} · ${percent}%` : `正在读取并计算 · ${percent}%`);
-          renderMessage('正在计算摘要', name ? `当前算法 ${name}` : '文件正在分块处理。', 'loading', progress);
+          showProgress(name ? `当前算法 ${name}` : '文件正在分块处理。', progress);
         });
         if (!results || token !== runToken) return;
         renderResults(results);
