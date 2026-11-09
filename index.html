@@ -2164,20 +2164,34 @@
       return tokens.every((token, i) => (i === tokens.length - 1 ? token.length <= size : token.length === size));
     }
 
+    // 在所有“连续成组”的片段里挑哈希：标签（如 Hash:）或文件名里零散的十六进制字符，
+    // 既不会被拼进哈希，也不会让分组书写的哈希被误认成其中某一组。
     function extractHex(line, expectedLength) {
-      const tokens = (line.replace(/0x(?=[0-9a-fA-F])/gi, '').match(/[0-9a-fA-F]+/g) || []).map(token => token.toLowerCase());
-      if (!tokens.length) return '';
-      const joined = tokens.join('');
-      if (isGrouped(tokens)) {
-        if (expectedLength && joined.length === expectedLength) return joined;
-        if (!expectedLength && HASH_LENGTHS.has(joined.length)) return joined;
+      const text = line.replace(/0x(?=[0-9a-fA-F])/gi, '');
+      const found = [...text.matchAll(/[0-9a-fA-F]+/g)];
+      const tokens = found.map(item => item[0].toLowerCase());
+      // 两个片段之间只隔着空白或常见分隔符时才算同一个哈希的相邻分组。
+      const adjacent = i => /^[\s:.\-_,]+$/.test(text.slice(found[i].index + found[i][0].length, found[i + 1].index));
+      let best = '';
+      let bestExact = false;
+      let bestScore = -1;
+      for (let start = 0; start < tokens.length; start += 1) {
+        let joined = '';
+        for (let end = start; end < tokens.length; end += 1) {
+          if (end > start && (!adjacent(end - 1) || tokens[start].length < 2)) break;
+          joined += tokens[end];
+          if (joined.length > 128 || !isGrouped(tokens.slice(start, end + 1))) break;
+          if (!HASH_LENGTHS.has(joined.length)) continue;
+          const exact = joined.length === expectedLength;
+          const score = exact ? end - start : joined.length;
+          if ((exact && !bestExact) || (exact === bestExact && score > bestScore)) {
+            best = joined;
+            bestExact = exact;
+            bestScore = score;
+          }
+        }
       }
-      if (expectedLength) {
-        const exact = tokens.find(token => token.length === expectedLength);
-        if (exact) return exact;
-      }
-      const known = tokens.filter(token => HASH_LENGTHS.has(token.length)).sort((a, b) => b.length - a.length);
-      return known[0] || joined;
+      return best;
     }
 
     const NAME_PATTERN = /sha-?3-?(?:224|256|384|512)|sha-?512[/-]?(?:224|256)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/gi;
