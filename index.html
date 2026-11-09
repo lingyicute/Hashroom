@@ -2430,11 +2430,12 @@
       resultsPanel.setAttribute('aria-busy', String(kind === 'loading'));
     }
 
-    function createDigestRow(result, index) {
+    function createDigestRow(result, index, animate) {
       const comparison = rowComparison(result);
       const row = document.createElement('article');
       row.className = `digest-row${comparison ? ` is-${comparison}` : ''}`;
-      row.style.animationDelay = `${index * 40}ms`;
+      if (animate) row.style.animationDelay = `${index * 40}ms`;
+      else row.style.animation = 'none';
       const content = document.createElement('div');
       const meta = document.createElement('div');
       meta.className = 'digest-meta';
@@ -2469,11 +2470,11 @@
       return row;
     }
 
-    function renderResults(results) {
+    function renderResults(results, animate = true) {
       currentResults = results;
       copyAllButton.disabled = !results.length;
       resultsPanel.className = 'results-panel';
-      resultsPanel.replaceChildren(...results.map(createDigestRow));
+      resultsPanel.replaceChildren(...results.map((result, index) => createDigestRow(result, index, animate)));
       resultsPanel.setAttribute('aria-busy', 'false');
     }
 
@@ -2919,13 +2920,13 @@
     expectedInput.addEventListener('input', () => {
       updateComparison();
       updateComputeButton();
-      if (currentResults.length) renderResults(currentResults);
+      if (currentResults.length) renderResults(currentResults, false);
     });
     clearExpected.addEventListener('click', () => {
       expectedInput.value = '';
       updateComparison();
       updateComputeButton();
-      if (currentResults.length) renderResults(currentResults);
+      if (currentResults.length) renderResults(currentResults, false);
       expectedInput.focus();
     });
     applySuggested.addEventListener('click', () => setCheckedAlgorithms(candidateAlgorithms(), false));
