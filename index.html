@@ -2290,14 +2290,22 @@
     function formatBytes(bytes) {
       if (bytes === 0) return '0 B';
       const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-      const index = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-      const value = bytes / (1024 ** index);
+      let index = 0;
+      let value = bytes;
+      while (value >= 1024 && index < units.length - 1) {
+        value /= 1024;
+        index += 1;
+      }
+      if (index > 0 && Math.round(value) >= 1024 && index < units.length - 1) {
+        value /= 1024;
+        index += 1;
+      }
       return `${value.toFixed(index === 0 || value >= 10 ? 0 : 1)} ${units[index]}`;
     }
 
     function describeFile(file) {
-      const parts = file.name.split('.');
-      const extensionName = parts.length > 1 ? parts[parts.length - 1] : '';
+      const dot = file.name.lastIndexOf('.');
+      const extensionName = dot > 0 && dot < file.name.length - 1 ? file.name.slice(dot + 1) : '';
       const extension = extensionName ? extensionName.toUpperCase() : (file.type ? file.type.split('/').pop().toUpperCase() : '文件');
       const modified = file.lastModified ? new Date(file.lastModified).toLocaleDateString('zh-CN', {year: 'numeric', month: '2-digit', day: '2-digit'}) : '';
       return [extension, formatBytes(file.size), modified].filter(Boolean).join(' · ');
