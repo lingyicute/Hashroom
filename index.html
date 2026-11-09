@@ -2255,23 +2255,35 @@
       return tokens.every((token, i) => (i === tokens.length - 1 ? token.length <= size : token.length === size));
     }
 
+    function hexTokens(line) {
+      const text = line.replace(/(?<![a-z0-9_])0x(?=[0-9a-f])/gi, '');
+      const found = [...text.matchAll(/[0-9a-fA-F]+/g)].filter(item => {
+        const before = item.index > 0 ? text[item.index - 1] : '';
+        const after = text.slice(item.index + item[0].length);
+        return !/[g-z./\\]/i.test(before) && !/^(?:[g-z/\\]|\.[a-z0-9])/i.test(after);
+      });
+      const sep = i => text.slice(found[i].index + found[i][0].length, found[i + 1].index);
+      // 两个片段之间只隔着单个空白或常见分隔符时才算同一个哈希的相邻分组；双空格是 sha256sum 文件名分隔符。
+      const adjacent = i => /^(?: |\t|[:\-_,，：]\s*)$/.test(sep(i));
+      return {tokens: found.map(item => item[0].toLowerCase()), sep, adjacent};
+    }
+
     // 在所有“连续成组”的片段里挑哈希：标签（如 Hash:）或文件名里零散的十六进制字符，
     // 既不会被拼进哈希，也不会让分组书写的哈希被误认成其中某一组。
     function extractHex(line, expectedLength) {
-      const text = line.replace(/0x(?=[0-9a-fA-F])/gi, '');
-      const found = [...text.matchAll(/[0-9a-fA-F]+/g)];
-      const tokens = found.map(item => item[0].toLowerCase());
-      // 两个片段之间只隔着空白或常见分隔符时才算同一个哈希的相邻分组。
-      const adjacent = i => /^[\s:.\-_,，：]+$/.test(text.slice(found[i].index + found[i][0].length, found[i + 1].index));
+      const {tokens, sep, adjacent} = hexTokens(line);
       let best = '';
       let bestExact = false;
       let bestScore = -1;
       for (let start = 0; start < tokens.length; start += 1) {
         let joined = '';
         for (let end = start; end < tokens.length; end += 1) {
-          if (end > start && (!adjacent(end - 1) || tokens[start].length < 2)) break;
+          if (end > start && (!adjacent(end - 1) || sep(end - 1) !== sep(start) || tokens[start].length < 2)) break;
           joined += tokens[end];
           if (joined.length > 128 || !isGrouped(tokens.slice(start, end + 1))) break;
+          // 同一串分组哈希还没结束时不提前截断，免得把少写一位的 63 位分组哈希拆成前 56 位。
+          if (tokens[start].length <= 16 && end + 1 < tokens.length && adjacent(end) && (end === start || sep(end) === sep(start)) && isGrouped(tokens.slice(start, end + 2))) continue;
+          if (start > 0 && tokens[start].length <= 16 && adjacent(start - 1) && tokens[start - 1].length >= 2 && tokens[start - 1].length <= 16 && (end > start ? sep(start - 1) === sep(start) : !/[:：]/.test(sep(start - 1)))) continue;
           if (!HASH_LENGTHS.has(joined.length)) continue;
           const exact = joined.length === expectedLength;
           const score = exact ? end - start : joined.length;
@@ -2285,6 +2297,21 @@
       return best;
     }
 
+    function longestHexRun(line) {
+      const {tokens, sep, adjacent} = hexTokens(line);
+      let max = 0;
+      for (let start = 0; start < tokens.length; start += 1) {
+        let len = 0;
+        for (let end = start; end < tokens.length; end += 1) {
+          if (end > start && (!adjacent(end - 1) || sep(end - 1) !== sep(start) || tokens[start].length < 2 || tokens[end].length < 2 || tokens[end].length > 16)) break;
+          len += tokens[end].length;
+          max = Math.max(max, len);
+          if (tokens[start].length > 16) break;
+        }
+      }
+      return max;
+    }
+
     // 真正的校验行不会很长；输入框每次改动都要重新解析，超长的行（比如误粘贴了整个文件）直接当作无法识别，
     // 免得在上面反复扫描拖慢页面。同一行也只看前几个算法名。
     const MAX_LINE_LENGTH = 2048;
@@ -2293,7 +2320,7 @@
     const NAME_PATTERN = /sha-?(?:2-?)?512[/-]?(?:224|256)|sha-?[23]-?(?:224|256|384|512)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/gi;
 
     // 紧跟在字母、数字、点或斜杠之后的名字多半是文件名的一部分（如 app.md5），
-    // 后面直接接扩展名的名字同理（如 sha256.txt），都不当作算法标记。
+    // 后面直接接扩展名、下划线、斜杠或其它字母数字的名字同理（如 sha256.txt、sha256sum.txt），都不当作算法标记。
     function findAlgorithmNames(line) {
       return [...line.matchAll(NAME_PATTERN)].filter(found => {
         if (found.index > 0) {
@@ -2302,7 +2329,8 @@
           // 紧贴单个连字符的名字多半是文件名的一部分（如 app-md5.iso），但命令行选项（--sha256）不是。
           if (before === '-' && found.index > 1 && /[a-z0-9._/\\]/i.test(line[found.index - 2])) return false;
         }
-        return !/^\.[a-z0-9]/i.test(line.slice(found.index + found[0].length));
+        const after = line.slice(found.index + found[0].length).replace(/^sum(?![a-z0-9._/\\-])/i, '');
+        return !/^[a-z0-9._/\\]/i.test(after);
       });
     }
 
@@ -2311,14 +2339,16 @@
       const padded = Math.ceil(byteLength / 3) * 4;
       const unpadded = Math.ceil(byteLength * 4 / 3);
       for (const token of text.match(/[A-Za-z0-9+/_=-]+/g) || []) {
-        for (const candidate of new Set([token, token.replace(/^[-=]+/, '')])) {
+        for (const candidate of new Set([token, token.replace(/^[-=]/, ''), token.replace(/^[-=]+/, '')])) {
           const body = candidate.replace(/=+$/, '');
           if (candidate.length !== padded && candidate.length !== unpadded) continue;
           if (body.length !== unpadded || /^[0-9a-f]+$/i.test(body) || /[^A-Za-z0-9+/_-]/.test(body)) continue;
+          if (/[+/]/.test(body) && /[-_]/.test(body)) continue;
           if (candidate.length !== body.length && candidate.length !== padded) continue;
           try {
-            const raw = atob(body.replace(/-/g, '+').replace(/_/g, '/').padEnd(padded, '='));
-            if (raw.length !== byteLength) continue;
+            const normalized = body.replace(/-/g, '+').replace(/_/g, '/');
+            const raw = atob(normalized.padEnd(padded, '='));
+            if (raw.length !== byteLength || btoa(raw).replace(/=+$/, '') !== normalized) continue;
             return bytesToHex(Uint8Array.from(raw, char => char.charCodeAt(0)));
           } catch (error) {
             // 不是合法的 Base64，继续找下一个片段。
@@ -2328,11 +2358,19 @@
       return '';
     }
 
-    // 从 sha256sum（“哈希  文件名”“哈希 *文件名”）和 BSD（“SHA256 (文件名) = 哈希”）的输出里取出文件名，
-    // 粘贴整份校验清单时才能只比对属于当前文件的那一行。以反斜杠开头的行（coreutils 转义过文件名）认不出文件名，照常参与比对。
+    // 从 sha256sum（“哈希  文件名”“哈希 *文件名”）和 BSD（“SHA256 (文件名) = 哈希”）的输出里拆出文件名，
+    // 既让整份校验清单只比对当前文件，也避免括号或末尾的文件名干扰算法和哈希识别。
+    // 以反斜杠开头的行（coreutils 转义过文件名）认不出文件名，照常参与比对。
+    function splitChecksumLine(line) {
+      const bsd = line.match(/^([A-Za-z][\w/-]*)\s*\((.+)\)\s*=\s*(\S.*)$/);
+      if (bsd) return {content: `${bsd[1]} = ${bsd[3]}`, file: bsd[2].trim().split(/[\\/]/).pop()};
+      const sum = line.match(/^((?:\w+sum\s+)?([0-9a-fA-F]{8,128}))(?: [ *])(.+)$/);
+      if (sum && HASH_LENGTHS.has(sum[2].length)) return {content: sum[1], file: sum[3].trim().split(/[\\/]/).pop()};
+      return {content: line, file: ''};
+    }
+
     function entryFileName(line) {
-      const found = line.match(/^[A-Za-z][\w/-]*\s*\((.+)\)\s*=\s*\S/) || line.match(/^(?:\w+sum\s+)?[0-9a-fA-F]{8,128}(?: [ *])(.+)$/);
-      return found ? found[1].trim().split(/[\\/]/).pop() : '';
+      return splitChecksumLine(line).file;
     }
 
     // 清单里有一行写明了当前文件的名字时，带有其他文件名的行不属于这个文件，不参与比对。
@@ -2353,14 +2391,16 @@
           invalidLines += 1;
           return;
         }
+        const {content, file} = splitChecksumLine(line);
         let algorithm = null;
         let hex = '';
-        for (const found of findAlgorithmNames(line).slice(0, MAX_NAMES_PER_LINE)) {
+        for (const found of findAlgorithmNames(content).slice(0, MAX_NAMES_PER_LINE)) {
           const id = canonicalAlgorithm(found[0]);
           const length = ALGORITHMS.find(item => item.id === id).bits / 4;
-          const rest = `${line.slice(0, found.index)} ${line.slice(found.index + found[0].length)}`;
-          let value = extractHex(rest, length);
-          if (value.length !== length && id !== 'CRC32') value = extractBase64(rest, length / 2) || value;
+          const after = content.slice(found.index + found[0].length);
+          const rest = `${content.slice(0, found.index)} ${after}`;
+          let value = after.startsWith('-') ? '' : extractHex(rest, length);
+          if (value.length !== length && id !== 'CRC32') value = extractBase64(after.startsWith('-') ? after : rest, length / 2) || value;
           if (!algorithm) {
             algorithm = id;
             hex = value;
@@ -2374,14 +2414,14 @@
         // 名字对应的长度与读到的哈希不符（如 sha1sum 输出里的文件名 sha256-notes.txt，或标签写错），
         // 这个名字就不是算法标记，改按长度判断，免得给哈希贴上错误的算法。
         if (algorithm && hex.length !== ALGORITHMS.find(item => item.id === algorithm).bits / 4) algorithm = null;
-        if (!algorithm) hex = extractHex(line, 0);
+        if (!algorithm && !HASH_LENGTHS.has(hex.length)) hex = extractHex(content, 0);
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
           invalidLines += 1;
           // 记下最长的一段十六进制，复制不完整的哈希可以据此给出提示。
-          (line.match(/[0-9a-f]+/gi) || []).forEach(run => { strayLength = Math.max(strayLength, run.length); });
+          strayLength = Math.max(strayLength, longestHexRun(content));
           return;
         }
-        entries.push({algorithm, hex, raw: line, file: entryFileName(line)});
+        entries.push({algorithm, hex, raw: line, file});
       });
       return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines, strayLength};
     }

@@ -161,6 +161,12 @@ async function main() {
     [`SHA-256：${sha256.match(/.{8}/g).join('，')}`, 'SHA-256', 64],
     [`${sha256}  my-sha256.txt`, null, 64],
     ['da39a3ee5e6b4b0d3255bfef95601890afd80709  sha256-notes.txt', null, 40],
+    [`${sha256}  sha256-notes.txt`, null, 64],
+    [`${sha256}  sha256sum.txt`, null, 64],
+    [`${sha256}  sha256_notes.txt`, null, 64],
+    ['d41d8cd9 8f00b204 e9800998 ecf8427e  deadbeef.bin', null, 32],
+    ['d41d8cd98f00b204e9800998ecf8427e  da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 32],
+    ['CRC32 (deadbeef) = cbf43926', 'CRC32', 8],
     ['SHA-256: da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 40]
   ];
   cases.forEach(([line, algorithm, length]) => {
@@ -169,9 +175,10 @@ async function main() {
     assert.strictEqual(parsed.entries[0].algorithm, algorithm, line);
     assert.strictEqual(parsed.entries[0].hex.length, length, line);
   });
-  // Base64 摘要：SRI、带算法名的行，含无填充和 URL 安全字母表。
+  assert.strictEqual(parseExpected('CRC32 (deadbeef) = cbf43926').entries[0].hex, 'cbf43926');
+  // Base64 摘要：SRI、带算法名的行，含无填充、URL 安全字母表及以连字符开头的 Base64url。
   for (const [name, id, node] of [['sha256', 'SHA-256', 'sha256'], ['sha384', 'SHA-384', 'sha384'], ['sha512', 'SHA-512', 'sha512'], ['sha1', 'SHA-1', 'sha1'], ['md5', 'MD5', 'md5']]) {
-    for (const data of ['', 'abc', 'hashroom']) {
+    for (const data of ['', 'abc', 'hashroom', '14']) {
       const digest = crypto.createHash(node).update(data).digest();
       const forms = [digest.toString('base64'), digest.toString('base64').replace(/=+$/, ''), digest.toString('base64url')];
       forms.forEach(b64 => {
@@ -186,9 +193,13 @@ async function main() {
   }
   assert.strictEqual(parseExpected('sha384 ' + sha256).entries[0].hex, sha256);
   assert.strictEqual(parseExpected('garbage').invalid, true);
-  const truncated = parseExpected(`SHA-256: ${sha256.slice(1)}`);
-  assert.strictEqual(truncated.invalid, true);
-  assert.strictEqual(truncated.strayLength, 63);
+  assert.strictEqual(parseExpected('deafbeefs').invalid, true);
+  assert.strictEqual(parseExpected('deadbeef.bin').invalid, true);
+  for (const sample of [`SHA-256: ${sha256.slice(1)}`, `SHA-256: ${spaced.slice(0, -1)}`, `SHA-256: ${spaced.slice(1)}`]) {
+    const truncated = parseExpected(sample);
+    assert.strictEqual(truncated.invalid, true, sample);
+    assert.strictEqual(truncated.strayLength, 63, sample);
+  }
   assert.ok(parseExpected('garbage').strayLength <= 8);
   const mixed = parseExpected(`SHA256 hash of file.iso:\n${sha256}\nCertUtil: -hashfile command completed successfully.`);
   assert.strictEqual(mixed.entries.length, 1);
