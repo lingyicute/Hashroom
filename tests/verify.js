@@ -238,6 +238,12 @@ async function main() {
   assert.ok(performance.now() - started < 1000, '超长行解析太慢');
   assert.strictEqual(hostile.entries.length, 1);
   assert.strictEqual(hostile.invalidLines, 2);
+  // 不超过长度上限、但挤满短十六进制片段的行同样不能拖慢解析。
+  const crowdedStart = performance.now();
+  const crowded = parseExpected(`${'ab '.repeat(680)}\n`.repeat(50) + `${spaced}  ok.iso`);
+  assert.ok(performance.now() - crowdedStart < 500, '短片段密集的行解析太慢');
+  assert.strictEqual(crowded.entries.length, 1);
+  assert.strictEqual(crowded.invalidLines, 50);
   console.log('ok    parseExpected');
 }
 
