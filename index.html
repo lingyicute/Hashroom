@@ -2367,7 +2367,9 @@
         value /= 1024;
         index += 1;
       }
-      return `${value.toFixed(index === 0 || value >= 10 ? 0 : 1)} ${units[index]}`;
+      let digits = index === 0 || value >= 10 ? 0 : 1;
+      if (digits === 1 && Math.round(value * 10) / 10 >= 10) digits = 0;
+      return `${value.toFixed(digits)} ${units[index]}`;
     }
 
     function describeFile(file) {
@@ -2528,6 +2530,7 @@
     }
 
     function fallbackCopy(text) {
+      const active = document.activeElement;
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.setAttribute('readonly', '');
@@ -2537,6 +2540,7 @@
       textarea.select();
       const copied = document.execCommand('copy');
       textarea.remove();
+      if (active && typeof active.focus === 'function') active.focus({preventScroll: true});
       if (!copied) throw new Error('Clipboard copy failed');
     }
 
