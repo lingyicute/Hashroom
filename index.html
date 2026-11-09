@@ -2351,6 +2351,20 @@
       return '';
     }
 
+    // 从 sha256sum（“哈希  文件名”“哈希 *文件名”）和 BSD（“SHA256 (文件名) = 哈希”）的输出里取出文件名，
+    // 粘贴整份校验清单时才能只比对属于当前文件的那一行。
+    function entryFileName(line) {
+      const found = line.match(/^[A-Za-z][\w/-]*\s*\((.+)\)\s*=\s*\S/) || line.match(/^(?:\w+sum\s+)?\\?[0-9a-fA-F]{8,128}(?: [ *])(.+)$/);
+      return found ? found[1].trim().split(/[\\/]/).pop() : '';
+    }
+
+    // 清单里有一行写明了当前文件的名字时，带有其他文件名的行不属于这个文件，不参与比对。
+    function entriesForFile(entries, fileName) {
+      if (!fileName || !entries.some(entry => entry.file === fileName)) return {entries, ignored: 0};
+      const kept = entries.filter(entry => !entry.file || entry.file === fileName);
+      return {entries: kept, ignored: entries.length - kept.length};
+    }
+
     function parseExpected(raw) {
       const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
       if (!lines.length) return {entries: [], invalid: false};
@@ -2386,7 +2400,7 @@
           (line.match(/[0-9a-f]+/gi) || []).forEach(run => { strayLength = Math.max(strayLength, run.length); });
           return;
         }
-        entries.push({algorithm, hex, raw: line});
+        entries.push({algorithm, hex, raw: line, file: entryFileName(line)});
       });
       return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines, strayLength};
     }
@@ -2447,7 +2461,8 @@
 
     function updateComparison() {
       const parsed = parseExpected(expectedInput.value);
-      expectedEntries = parsed.entries;
+      const scoped = entriesForFile(parsed.entries, selectedFile && selectedFile.name);
+      expectedEntries = scoped.entries;
       expectedInvalid = parsed.invalid;
       const missing = missingCandidates();
       applySuggested.hidden = !expectedEntries.length || !missing.length;
@@ -2477,6 +2492,7 @@
       let hint = named.length ? `已识别 ${named.join('、')}` : `已识别 ${expectedEntries[0].hex.length} 位十六进制`;
       if (!named.length && lengthNames.length) hint += `，可能是 ${lengthNames.join('、')}`;
       if (parsed.partialInvalid) hint += `。有 ${parsed.invalidLines} 行无法识别，已忽略`;
+      if (scoped.ignored) hint += `。已忽略 ${scoped.ignored} 条属于其他文件的校验值`;
       compareHint.textContent = `${hint}。`;
 
       if (!currentResults.length) {
