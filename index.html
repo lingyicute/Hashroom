@@ -1367,6 +1367,7 @@
     ];
 
     const WEB_CRYPTO = new Set(['SHA-1', 'SHA-256', 'SHA-384', 'SHA-512']);
+    const BUFFER_LIMIT = 256 * 1024 * 1024;
     const HASH_LENGTHS = new Set(ALGORITHMS.map(item => item.bits / 4));
 
     const fileInput = document.getElementById('fileInput');
@@ -2468,34 +2469,59 @@
       return new Promise(resolve => setTimeout(resolve, 0));
     }
 
+    async function digestBytesAsync(id, bytes, token, onProgress) {
+      const hasher = createHasher(id);
+      const step = 1024 * 1024;
+      let lastYield = performance.now();
+      for (let offset = 0; offset < bytes.length; offset += step) {
+        if (token !== runToken) return null;
+        hasher.update(bytes.subarray(offset, offset + step));
+        onProgress(Math.min(1, (offset + step) / bytes.length));
+        if (performance.now() - lastYield > 30) {
+          await yieldUi();
+          lastYield = performance.now();
+        }
+      }
+      return hasher.digest();
+    }
+
     async function hashFile(file, ids, token, onProgress) {
-      const canUseSubtle = ids.every(id => WEB_CRYPTO.has(id)) && window.crypto && crypto.subtle;
-      if (canUseSubtle) {
-        const buffer = await file.arrayBuffer();
+      const subtle = window.crypto && crypto.subtle;
+      const useBuffer = file.size <= BUFFER_LIMIT && subtle && ids.some(id => WEB_CRYPTO.has(id));
+      if (useBuffer) {
+        const bytes = new Uint8Array(await file.arrayBuffer());
         if (token !== runToken) return null;
         const results = [];
         for (let i = 0; i < ids.length; i += 1) {
-          let hex;
-          try {
-            hex = bytesToHex(new Uint8Array(await crypto.subtle.digest(ids[i], buffer)));
-          } catch (error) {
-            hex = digestBytes(ids[i], new Uint8Array(buffer));
+          const id = ids[i];
+          let hex = null;
+          if (WEB_CRYPTO.has(id)) {
+            try {
+              hex = bytesToHex(new Uint8Array(await subtle.digest(id, bytes)));
+            } catch (error) {
+              hex = null;
+            }
           }
-          results.push({algorithm: ids[i], hex});
-          onProgress((i + 1) / ids.length, ids[i]);
-          if (token !== runToken) return null;
+          if (hex === null) hex = await digestBytesAsync(id, bytes, token, fraction => onProgress((i + fraction) / ids.length, id));
+          if (hex === null || token !== runToken) return null;
+          results.push({algorithm: id, hex});
+          onProgress((i + 1) / ids.length, id);
         }
         return results;
       }
 
       const hashers = ids.map(id => ({id, hasher: createHasher(id)}));
-      const sliceSize = 512 * 1024;
+      const sliceSize = 1024 * 1024;
+      let lastYield = performance.now();
       for (let offset = 0; offset < file.size; offset += sliceSize) {
         if (token !== runToken) return null;
         const bytes = new Uint8Array(await file.slice(offset, offset + sliceSize).arrayBuffer());
         hashers.forEach(item => item.hasher.update(bytes));
         onProgress(Math.min(1, (offset + bytes.length) / Math.max(file.size, 1)));
-        await yieldUi();
+        if (performance.now() - lastYield > 30) {
+          await yieldUi();
+          lastYield = performance.now();
+        }
       }
       if (token !== runToken) return null;
       return hashers.map(item => ({algorithm: item.id, hex: item.hasher.digest()}));
@@ -2516,8 +2542,14 @@
       setStatus('正在读取文件并计算摘要…');
       renderMessage('正在计算摘要', '大文件可能需要一点时间，请保持页面打开。', 'loading', 0.04);
       try {
+        let lastPaint = -Infinity;
+        let lastName;
         const results = await hashFile(file, ids, token, (progress, name) => {
           if (token !== runToken) return;
+          const now = performance.now();
+          if (name === lastName && now - lastPaint < 100) return;
+          lastName = name;
+          lastPaint = now;
           const percent = Math.round(progress * 100);
           setStatus(name ? `正在计算 ${name} · ${percent}%` : `正在读取并计算 · ${percent}%`);
           renderMessage('正在计算摘要', name ? `当前算法 ${name}` : '文件正在分块处理。', 'loading', progress);
