@@ -2998,7 +2998,11 @@
       dropzone.classList.remove('is-dragging');
       if (!dropzone.contains(event.target)) acceptDrop(event);
     });
-    clearFileButton.addEventListener('click', () => setSelectedFile(null));
+    clearFileButton.addEventListener('click', () => {
+      setSelectedFile(null);
+      // 清除按钮随即隐藏，把焦点交给选择区域，键盘用户不会丢失位置。
+      dropzone.focus();
+    });
     computeButton.addEventListener('click', computeHashes);
     document.getElementById('selectCommon').addEventListener('click', () => {
       setCheckedAlgorithms(ALGORITHMS.filter(item => item.group === 'common').map(item => item.id), true);
