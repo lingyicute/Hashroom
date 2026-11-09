@@ -181,6 +181,15 @@ async function main() {
     const parsed = parseExpected(line);
     assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex, entry.file]), [[algorithm, sha256, '']], line);
   }
+  // 网页上复制来的哈希可能用不换行空格、全角空格分组或夹带零宽字符；文件名可能是 NFD 形式。
+  for (const space of ['\u00a0', '\u3000', '\u202f']) {
+    const parsed = parseExpected(`SHA-256:${space}${sha256.match(/.{8}/g).join(space)}`);
+    assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex]), [['SHA-256', sha256]], JSON.stringify(space));
+  }
+  assert.strictEqual(parseExpected(`\u200b${sha256.slice(0, 32)}\u200b${sha256.slice(32)}  a.iso`).entries[0].hex, sha256);
+  const composed = parseExpected(`${sha256}  caf\u00e9.iso\u2028d41d8cd98f00b204e9800998ecf8427e  other.iso`);
+  assert.strictEqual(composed.entries.length, 2);
+  assert.strictEqual(entriesForFile(composed.entries, 'cafe\u0301.iso').entries.length, 1);
   // Base64 摘要：SRI、带算法名的行，含无填充、URL 安全字母表及以连字符开头的 Base64url。
   for (const [name, id, node] of [['sha256', 'SHA-256', 'sha256'], ['sha384', 'SHA-384', 'sha384'], ['sha512', 'SHA-512', 'sha512'], ['sha1', 'SHA-1', 'sha1'], ['md5', 'MD5', 'md5']]) {
     for (const data of ['', 'abc', 'hashroom', '14']) {
