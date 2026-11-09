@@ -1834,20 +1834,32 @@
     const KECCAK_PI = [10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1];
     const KECCAK_RC = '0000000000000001 0000000000008082 800000000000808a 8000000080008000 000000000000808b 0000000080000001 8000000080008081 8000000000008009 000000000000008a 0000000000000088 0000000080008009 000000008000000a 000000008000808b 800000000000008b 8000000000008089 8000000000008003 8000000000008002 8000000000000080 000000000000800a 800000008000000a 8000000080008081 8000000000008080 0000000080000001 8000000080008008'.split(' ').map(hex => [parseInt(hex.slice(8), 16), parseInt(hex.slice(0, 8), 16)]);
 
+    const KECCAK_ROT = new Uint32Array(2);
+    const KECCAK_C = new Uint32Array(10);
+    const KECCAK_D = new Uint32Array(10);
+    const KECCAK_ROW = new Uint32Array(10);
+
     function rotlLane(lo, hi, bits) {
       bits &= 63;
-      if (bits === 0) return [lo, hi];
-      if (bits === 32) return [hi, lo];
-      if (bits < 32) {
-        return [((lo << bits) | (hi >>> (32 - bits))) >>> 0, ((hi << bits) | (lo >>> (32 - bits))) >>> 0];
+      if (bits === 0) {
+        KECCAK_ROT[0] = lo;
+        KECCAK_ROT[1] = hi;
+      } else if (bits === 32) {
+        KECCAK_ROT[0] = hi;
+        KECCAK_ROT[1] = lo;
+      } else if (bits < 32) {
+        KECCAK_ROT[0] = (lo << bits) | (hi >>> (32 - bits));
+        KECCAK_ROT[1] = (hi << bits) | (lo >>> (32 - bits));
+      } else {
+        bits -= 32;
+        KECCAK_ROT[0] = (hi << bits) | (lo >>> (32 - bits));
+        KECCAK_ROT[1] = (lo << bits) | (hi >>> (32 - bits));
       }
-      bits -= 32;
-      return [((hi << bits) | (lo >>> (32 - bits))) >>> 0, ((lo << bits) | (hi >>> (32 - bits))) >>> 0];
     }
 
     function keccakF(state) {
       for (let round = 0; round < 24; round += 1) {
-        const c = new Uint32Array(10);
+        const c = KECCAK_C;
         for (let x = 0; x < 5; x += 1) {
           let lo = state[x * 2];
           let hi = state[x * 2 + 1];
@@ -1858,7 +1870,7 @@
           c[x * 2] = lo >>> 0;
           c[x * 2 + 1] = hi >>> 0;
         }
-        const d = new Uint32Array(10);
+        const d = KECCAK_D;
         for (let x = 0; x < 5; x += 1) {
           const x1 = ((x + 1) % 5) * 2;
           const x4 = ((x + 4) % 5) * 2;
@@ -1878,15 +1890,15 @@
           const pi = KECCAK_PI[i] * 2;
           const curLo = state[pi];
           const curHi = state[pi + 1];
-          const rotated = rotlLane(lastLo, lastHi, KECCAK_RHO[i]);
-          state[pi] = rotated[0];
-          state[pi + 1] = rotated[1];
+          rotlLane(lastLo, lastHi, KECCAK_RHO[i]);
+          state[pi] = KECCAK_ROT[0];
+          state[pi + 1] = KECCAK_ROT[1];
           lastLo = curLo;
           lastHi = curHi;
         }
         for (let y = 0; y < 5; y += 1) {
           const base = y * 5;
-          const row = new Uint32Array(10);
+          const row = KECCAK_ROW;
           for (let x = 0; x < 5; x += 1) {
             row[x * 2] = state[(base + x) * 2];
             row[x * 2 + 1] = state[(base + x) * 2 + 1];
