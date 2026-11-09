@@ -79,7 +79,13 @@ async function main() {
     [`SHA256 (file.iso) = ${sha256}`, 'SHA-256', 64],
     ['MD5: d41d8cd9 8f00b204 e9800998 ecf8427e', 'MD5', 32],
     ['CRC32: CBF43926', 'CRC32', 8],
-    [sha256.toUpperCase(), null, 64]
+    [sha256.toUpperCase(), null, 64],
+    [`${sha256}  release.sha256`, null, 64],
+    [`${sha256}  app-md5.iso`, null, 64],
+    [`sha256sum ${sha256} *app_md5.bin`, 'SHA-256', 64],
+    ['d41d8cd98f00b204e9800998ecf8427e  cafebabe', null, 32],
+    ['d41d8cd98f00b204e9800998ecf8427e  deadbeef.bin', null, 32],
+    ['cbf43926  cafe.txt', null, 8]
   ];
   cases.forEach(([line, algorithm, length]) => {
     const parsed = parseExpected(line);
