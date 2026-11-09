@@ -9,6 +9,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy"
+    content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+  <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
   <meta name="description" content="在浏览器本地计算文件的 MD5、SHA-1、SHA-2、SHA-3、RIPEMD-160 和 CRC32 摘要，并与已有校验值比对。文件不会上传。">
@@ -1204,6 +1207,9 @@
 </head>
 
 <body>
+  <noscript>
+    <p style="padding:16px;text-align:center">Hashroom 需要启用 JavaScript 才能在浏览器中计算文件摘要。</p>
+  </noscript>
   <div class="app-shell">
     <header class="topbar">
       <a class="brand" href="#top" aria-label="Hashroom 首页">
