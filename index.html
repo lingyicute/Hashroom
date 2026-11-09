@@ -3221,6 +3221,10 @@
       paletteMenu.hidden = !open;
       paletteToggle.setAttribute('aria-expanded', String(open));
     });
+    // 用 Tab 把焦点移出调色板时一并收起菜单，不让它悬在页面上。
+    paletteMenu.parentElement.addEventListener('focusout', event => {
+      if (!paletteMenu.hidden && event.relatedTarget && !paletteMenu.parentElement.contains(event.relatedTarget)) closePalette();
+    });
     document.addEventListener('click', event => {
       if (!paletteMenu.hidden && !paletteToggle.contains(event.target) && !paletteMenu.contains(event.target)) closePalette();
     });
