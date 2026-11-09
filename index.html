@@ -1957,7 +1957,26 @@
       }
 
       update(data) {
-        for (let i = 0; i < data.length; i += 1) this.absorbByte(data[i]);
+        const length = data.length;
+        let i = 0;
+        while (i < length && (this.offset & 3)) {
+          this.absorbByte(data[i]);
+          i += 1;
+        }
+        // 速率是 4 的倍数，对齐之后可以整字吸收。
+        while (i + 4 <= length) {
+          this.lanes[this.offset >> 2] ^= data[i] | (data[i + 1] << 8) | (data[i + 2] << 16) | (data[i + 3] << 24);
+          this.offset += 4;
+          if (this.offset === this.rate) {
+            keccakF(this.lanes);
+            this.offset = 0;
+          }
+          i += 4;
+        }
+        while (i < length) {
+          this.absorbByte(data[i]);
+          i += 1;
+        }
         return this;
       }
 
