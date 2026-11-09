@@ -1469,6 +1469,10 @@
       writeU32BE(buffer, offset + 12, bitLo);
     }
 
+    const SCRATCH16 = new Uint32Array(16);
+    const SCRATCH64 = new Uint32Array(64);
+    const SCRATCH80 = new Uint32Array(80);
+
     class BufferedHash {
       constructor(blockSize) {
         this.blockSize = blockSize;
@@ -1530,7 +1534,7 @@
       }
 
       process(block, offset) {
-        const m = new Uint32Array(16);
+        const m = SCRATCH16;
         for (let i = 0; i < 16; i += 1) m[i] = readU32LE(block, offset + i * 4);
         let a = this.h[0];
         let b = this.h[1];
@@ -1579,7 +1583,7 @@
       }
 
       process(block, offset) {
-        const w = new Uint32Array(80);
+        const w = SCRATCH80;
         for (let i = 0; i < 16; i += 1) w[i] = readU32BE(block, offset + i * 4);
         for (let i = 16; i < 80; i += 1) w[i] = rotl32(w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16], 1);
         let a = this.h[0];
@@ -1635,45 +1639,48 @@
       }
 
       process(block, offset) {
-        const w = new Uint32Array(64);
+        const w = SCRATCH64;
+        const h = this.h;
         for (let i = 0; i < 16; i += 1) w[i] = readU32BE(block, offset + i * 4);
         for (let i = 16; i < 64; i += 1) {
-          const s0 = (rotr32(w[i - 15], 7) ^ rotr32(w[i - 15], 18) ^ (w[i - 15] >>> 3)) >>> 0;
-          const s1 = (rotr32(w[i - 2], 17) ^ rotr32(w[i - 2], 19) ^ (w[i - 2] >>> 10)) >>> 0;
-          w[i] = (w[i - 16] + s0 + w[i - 7] + s1) >>> 0;
+          const x = w[i - 15];
+          const y = w[i - 2];
+          const s0 = ((x >>> 7) | (x << 25)) ^ ((x >>> 18) | (x << 14)) ^ (x >>> 3);
+          const s1 = ((y >>> 17) | (y << 15)) ^ ((y >>> 19) | (y << 13)) ^ (y >>> 10);
+          w[i] = (w[i - 16] + s0 + w[i - 7] + s1) | 0;
         }
-        let a = this.h[0];
-        let b = this.h[1];
-        let c = this.h[2];
-        let d = this.h[3];
-        let e = this.h[4];
-        let f = this.h[5];
-        let g = this.h[6];
-        let h = this.h[7];
+        let a = h[0] | 0;
+        let b = h[1] | 0;
+        let c = h[2] | 0;
+        let d = h[3] | 0;
+        let e = h[4] | 0;
+        let f = h[5] | 0;
+        let g = h[6] | 0;
+        let hh = h[7] | 0;
         for (let i = 0; i < 64; i += 1) {
-          const s1 = (rotr32(e, 6) ^ rotr32(e, 11) ^ rotr32(e, 25)) >>> 0;
-          const ch = ((e & f) ^ (~e & g)) >>> 0;
-          const t1 = (h + s1 + ch + K256[i] + w[i]) >>> 0;
-          const s0 = (rotr32(a, 2) ^ rotr32(a, 13) ^ rotr32(a, 22)) >>> 0;
-          const maj = ((a & b) ^ (a & c) ^ (b & c)) >>> 0;
-          const t2 = (s0 + maj) >>> 0;
-          h = g;
+          const s1 = ((e >>> 6) | (e << 26)) ^ ((e >>> 11) | (e << 21)) ^ ((e >>> 25) | (e << 7));
+          const ch = (e & f) ^ (~e & g);
+          const t1 = (hh + s1 + ch + K256[i] + w[i]) | 0;
+          const s0 = ((a >>> 2) | (a << 30)) ^ ((a >>> 13) | (a << 19)) ^ ((a >>> 22) | (a << 10));
+          const maj = (a & b) ^ (a & c) ^ (b & c);
+          const t2 = (s0 + maj) | 0;
+          hh = g;
           g = f;
           f = e;
-          e = (d + t1) >>> 0;
+          e = (d + t1) | 0;
           d = c;
           c = b;
           b = a;
-          a = (t1 + t2) >>> 0;
+          a = (t1 + t2) | 0;
         }
-        this.h[0] = (this.h[0] + a) >>> 0;
-        this.h[1] = (this.h[1] + b) >>> 0;
-        this.h[2] = (this.h[2] + c) >>> 0;
-        this.h[3] = (this.h[3] + d) >>> 0;
-        this.h[4] = (this.h[4] + e) >>> 0;
-        this.h[5] = (this.h[5] + f) >>> 0;
-        this.h[6] = (this.h[6] + g) >>> 0;
-        this.h[7] = (this.h[7] + h) >>> 0;
+        h[0] += a;
+        h[1] += b;
+        h[2] += c;
+        h[3] += d;
+        h[4] += e;
+        h[5] += f;
+        h[6] += g;
+        h[7] += hh;
       }
 
       digest() {
@@ -1972,14 +1979,15 @@
     const RIPEMD_SR = [8, 9, 9, 11, 13, 15, 15, 5, 7, 7, 8, 11, 14, 14, 12, 6, 9, 13, 15, 7, 12, 8, 9, 11, 7, 7, 12, 7, 6, 15, 13, 11, 9, 7, 15, 11, 8, 6, 6, 14, 12, 13, 5, 14, 13, 13, 7, 5, 15, 5, 8, 11, 14, 14, 6, 14, 6, 9, 12, 9, 12, 5, 15, 8, 8, 5, 12, 9, 12, 5, 14, 6, 8, 13, 6, 5, 15, 13, 11, 11];
     const RIPEMD_KL = Uint32Array.of(0x00000000, 0x5a827999, 0x6ed9eba1, 0x8f1bbcdc, 0xa953fd4e);
     const RIPEMD_KR = Uint32Array.of(0x50a28be6, 0x5c4dd124, 0x6d703ef3, 0x7a6d76e9, 0x00000000);
-    const RIPEMD_FL = [
-      (b, c, d) => (b ^ c ^ d) >>> 0,
-      (b, c, d) => ((b & c) | ((~b >>> 0) & d)) >>> 0,
-      (b, c, d) => ((b | (~c >>> 0)) ^ d) >>> 0,
-      (b, c, d) => ((b & d) | (c & (~d >>> 0))) >>> 0,
-      (b, c, d) => (b ^ (c | (~d >>> 0))) >>> 0
-    ];
-    const RIPEMD_FR = RIPEMD_FL.slice().reverse();
+    function ripemdF(round, b, c, d) {
+      switch (round) {
+        case 0: return b ^ c ^ d;
+        case 1: return (b & c) | (~b & d);
+        case 2: return (b | ~c) ^ d;
+        case 3: return (b & d) | (c & ~d);
+        default: return b ^ (c | ~d);
+      }
+    }
 
     class Ripemd160 extends BufferedHash {
       constructor() {
@@ -1988,7 +1996,7 @@
       }
 
       process(block, offset) {
-        const w = new Uint32Array(16);
+        const w = SCRATCH16;
         for (let i = 0; i < 16; i += 1) w[i] = readU32LE(block, offset + i * 4);
         let al = this.h[0];
         let bl = this.h[1];
@@ -2002,14 +2010,14 @@
         let er = el;
         for (let i = 0; i < 80; i += 1) {
           const round = i >> 4;
-          const tl = (al + RIPEMD_FL[round](bl, cl, dl) + w[RIPEMD_IL[i]] + RIPEMD_KL[round]) >>> 0;
+          const tl = (al + ripemdF(round, bl, cl, dl) + w[RIPEMD_IL[i]] + RIPEMD_KL[round]) >>> 0;
           const nal = (rotl32(tl, RIPEMD_SL[i]) + el) >>> 0;
           al = el;
           el = dl;
           dl = rotl32(cl, 10);
           cl = bl;
           bl = nal;
-          const tr = (ar + RIPEMD_FR[round](br, cr, dr) + w[RIPEMD_IR[i]] + RIPEMD_KR[round]) >>> 0;
+          const tr = (ar + ripemdF(4 - round, br, cr, dr) + w[RIPEMD_IR[i]] + RIPEMD_KR[round]) >>> 0;
           const nar = (rotl32(tr, RIPEMD_SR[i]) + er) >>> 0;
           ar = er;
           er = dr;
