@@ -20,10 +20,12 @@ const code = [
   'const BUFFER_LIMIT = 256 * 1024 * 1024;',
   'const HASH_LENGTHS = new Set(ALGORITHMS.map(item => item.bits / 4));',
   'let runToken = 1; const window = globalThis;',
+  // 让出线程的辅助函数在 Node 里会让 MessagePort 挂住事件循环，测试中走 setTimeout 的退路。
+  'const MessageChannel = undefined;',
   cut('function rotr32', 'function hexEqual'),
   'globalThis.__writeBitLength = writeBitLength;',
   cut('function canonicalAlgorithm', 'function entryTargets'),
-  cut('function yieldUi', 'async function computeHashes'),
+  cut('const yieldQueue', 'async function computeHashes'),
   'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected};'
 ].join('\n');
 

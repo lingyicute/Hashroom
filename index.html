@@ -2642,8 +2642,25 @@
       }
     }
 
+    // 后台标签页里 setTimeout 会被限流到每秒一次，计算大文件时每 30 毫秒让出一次就会慢得无法忍受；
+    // MessageChannel 不受这种限流影响，不支持时再退回 setTimeout。
+    const yieldQueue = [];
+    let yieldPort = null;
+
     function yieldUi() {
-      return new Promise(resolve => setTimeout(resolve, 0));
+      if (typeof MessageChannel !== 'function') return new Promise(resolve => setTimeout(resolve, 0));
+      if (!yieldPort) {
+        const channel = new MessageChannel();
+        channel.port1.onmessage = () => {
+          const resolve = yieldQueue.shift();
+          if (resolve) resolve();
+        };
+        yieldPort = channel.port2;
+      }
+      return new Promise(resolve => {
+        yieldQueue.push(resolve);
+        yieldPort.postMessage(0);
+      });
     }
 
     async function digestBytesAsync(id, bytes, token, onProgress) {
