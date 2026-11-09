@@ -2856,22 +2856,6 @@
       });
     }
 
-    async function digestBytesAsync(id, bytes, token, onProgress) {
-      const hasher = createHasher(id);
-      const step = 1024 * 1024;
-      let lastYield = performance.now();
-      for (let offset = 0; offset < bytes.length; offset += step) {
-        if (token !== runToken) return null;
-        hasher.update(bytes.subarray(offset, offset + step));
-        onProgress(Math.min(1, (offset + step) / bytes.length));
-        if (performance.now() - lastYield > 30) {
-          await yieldUi();
-          lastYield = performance.now();
-        }
-      }
-      return hasher.digest();
-    }
-
     async function hashFile(file, ids, token, onProgress) {
       const subtle = window.crypto && crypto.subtle;
       const useBuffer = file.size <= BUFFER_LIMIT && subtle && ids.some(id => WEB_CRYPTO.has(id));
@@ -2887,18 +2871,40 @@
       }
       if (bytes) {
         const results = [];
+        const step = 1024 * 1024;
+        let lastYield = performance.now();
         for (let i = 0; i < ids.length; i += 1) {
+          if (token !== runToken) return null;
           const id = ids[i];
+          onProgress(i / ids.length, id);
           let hex = null;
           if (WEB_CRYPTO.has(id)) {
             try {
               hex = bytesToHex(new Uint8Array(await subtle.digest(id, bytes)));
+              lastYield = performance.now();
             } catch (error) {
               hex = null;
             }
           }
-          if (hex === null) hex = await digestBytesAsync(id, bytes, token, fraction => onProgress((i + fraction) / ids.length, id));
-          if (hex === null || token !== runToken) return null;
+          if (hex === null) {
+            const hasher = createHasher(id);
+            for (let offset = 0; offset < bytes.length; offset += step) {
+              if (token !== runToken) return null;
+              hasher.update(bytes.subarray(offset, offset + step));
+              onProgress((i + Math.min(1, (offset + step) / bytes.length)) / ids.length, id);
+              if (performance.now() - lastYield > 30) {
+                await yieldUi();
+                lastYield = performance.now();
+                if (token !== runToken) return null;
+              }
+            }
+            hex = hasher.digest();
+            if (performance.now() - lastYield > 30) {
+              await yieldUi();
+              lastYield = performance.now();
+            }
+          }
+          if (token !== runToken) return null;
           results.push({algorithm: id, hex});
           onProgress((i + 1) / ids.length, id);
         }
