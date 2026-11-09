@@ -3215,6 +3215,12 @@
       dropzone.focus();
     });
     computeButton.addEventListener('click', computeHashes);
+    // 大文件算到一半时误关标签页或刷新会前功尽弃，计算期间让浏览器先确认一下。
+    window.addEventListener('beforeunload', event => {
+      if (!isCalculating) return;
+      event.preventDefault();
+      event.returnValue = '';
+    });
     document.getElementById('selectCommon').addEventListener('click', () => {
       setCheckedAlgorithms(ALGORITHMS.filter(item => item.group === 'common').map(item => item.id), true);
     });
