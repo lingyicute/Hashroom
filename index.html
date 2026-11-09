@@ -2182,16 +2182,20 @@
 
     const NAME_PATTERN = /sha-?3-?(?:224|256|384|512)|sha-?512[/-]?(?:224|256)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/gi;
 
-    // 紧跟在字母、数字、点、斜杠或连字符之后的名字多半是文件名的一部分（如 app.md5），不当作算法标记。
+    // 紧跟在字母、数字、点、斜杠或连字符之后的名字多半是文件名的一部分（如 app.md5），
+    // 后面直接接扩展名的名字同理（如 sha256.txt），都不当作算法标记。
     function findAlgorithmNames(line) {
-      return [...line.matchAll(NAME_PATTERN)].filter(found => found.index === 0 || !/[a-z0-9._/\\-]/i.test(line[found.index - 1]));
+      return [...line.matchAll(NAME_PATTERN)].filter(found => {
+        if (found.index > 0 && /[a-z0-9._/\\-]/i.test(line[found.index - 1])) return false;
+        return !/^\.[a-z0-9]/i.test(line.slice(found.index + found[0].length));
+      });
     }
 
     function parseExpected(raw) {
       const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
       if (!lines.length) return {entries: [], invalid: false};
       const entries = [];
-      let invalid = false;
+      let invalidLines = 0;
       lines.forEach(line => {
         let algorithm = null;
         let hex = '';
@@ -2211,12 +2215,12 @@
         }
         if (!algorithm) hex = extractHex(line, 0);
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
-          invalid = true;
+          invalidLines += 1;
           return;
         }
         entries.push({algorithm, hex, raw: line});
       });
-      return {entries, invalid: invalid && !entries.length, partialInvalid: invalid && entries.length > 0};
+      return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines};
     }
 
     function entryTargets(entry, algorithm, hex) {
@@ -2297,7 +2301,7 @@
       const lengthNames = [...new Set(unnamed.flatMap(entry => algorithmsForLength(entry.hex.length).map(item => item.id)))];
       let hint = named.length ? `已识别 ${named.join('、')}` : `已识别 ${expectedEntries[0].hex.length} 位十六进制`;
       if (!named.length && lengthNames.length) hint += `，可能是 ${lengthNames.join('、')}`;
-      if (parsed.partialInvalid) hint += '。有一行无法识别，已忽略';
+      if (parsed.partialInvalid) hint += `。有 ${parsed.invalidLines} 行无法识别，已忽略`;
       compareHint.textContent = `${hint}。`;
 
       if (!currentResults.length) {
