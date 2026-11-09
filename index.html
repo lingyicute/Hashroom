@@ -2375,15 +2375,22 @@
       return {content: line, file: ''};
     }
 
+    // 网页上复制的哈希常用不换行空格、全角空格分组，或夹带零宽字符；macOS 上的文件名还可能是 NFD 形式。
+    // 预期值和当前文件名都先按同样的规则规范化，再识别、比较。
+    function normalizeText(text) {
+      return text.normalize('NFC').replace(/[\u200b-\u200d\u2060\ufeff]/g, '').replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, ' ');
+    }
+
     // 清单里有一行写明了当前文件的名字时，带有其他文件名的行不属于这个文件，不参与比对。
     function entriesForFile(entries, fileName) {
-      if (!fileName || !entries.some(entry => entry.file === fileName)) return {entries, ignored: 0};
-      const kept = entries.filter(entry => !entry.file || entry.file === fileName);
+      const name = fileName ? normalizeText(fileName) : '';
+      if (!name || !entries.some(entry => entry.file === name)) return {entries, ignored: 0};
+      const kept = entries.filter(entry => !entry.file || entry.file === name);
       return {entries: kept, ignored: entries.length - kept.length};
     }
 
     function parseExpected(raw) {
-      const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+      const lines = normalizeText(raw).split(/\r\n?|[\n\u2028\u2029]/).map(line => line.trim()).filter(Boolean);
       if (!lines.length) return {entries: [], invalid: false};
       const entries = [];
       let invalidLines = 0;
