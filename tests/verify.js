@@ -103,7 +103,10 @@ async function main() {
     [`sha256sum ${sha256} *app_md5.bin`, 'SHA-256', 64],
     ['d41d8cd98f00b204e9800998ecf8427e  cafebabe', null, 32],
     ['d41d8cd98f00b204e9800998ecf8427e  deadbeef.bin', null, 32],
-    ['cbf43926  cafe.txt', null, 8]
+    ['cbf43926  cafe.txt', null, 8],
+    [`${sha256}  sha1.txt`, null, 64],
+    [`${sha256} *sha256.sum`, null, 64],
+    [`${sha256}  md5.exe`, null, 64]
   ];
   cases.forEach(([line, algorithm, length]) => {
     const parsed = parseExpected(line);
@@ -112,6 +115,10 @@ async function main() {
     assert.strictEqual(parsed.entries[0].hex.length, length, line);
   });
   assert.strictEqual(parseExpected('garbage').invalid, true);
+  const mixed = parseExpected(`SHA256 hash of file.iso:\n${sha256}\nCertUtil: -hashfile command completed successfully.`);
+  assert.strictEqual(mixed.entries.length, 1);
+  assert.strictEqual(mixed.partialInvalid, true);
+  assert.strictEqual(mixed.invalidLines, 2);
   console.log('ok    parseExpected');
 }
 
