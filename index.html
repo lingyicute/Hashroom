@@ -2131,12 +2131,22 @@
       return ALGORITHMS.filter(item => item.bits / 4 === length);
     }
 
+    // 分组书写的哈希（如 8 位一组）各组等长，仅最后一组可以更短；
+    // 文件名里恰好由十六进制字符组成的片段不满足这一点，不能被拼进哈希。
+    function isGrouped(tokens) {
+      const size = tokens[0].length;
+      if (tokens.length > 1 && size > 16) return false;
+      return tokens.every((token, i) => (i === tokens.length - 1 ? token.length <= size : token.length === size));
+    }
+
     function extractHex(line, expectedLength) {
       const tokens = (line.replace(/0x(?=[0-9a-fA-F])/gi, '').match(/[0-9a-fA-F]+/g) || []).map(token => token.toLowerCase());
       if (!tokens.length) return '';
       const joined = tokens.join('');
-      if (expectedLength && joined.length === expectedLength) return joined;
-      if (!expectedLength && HASH_LENGTHS.has(joined.length)) return joined;
+      if (isGrouped(tokens)) {
+        if (expectedLength && joined.length === expectedLength) return joined;
+        if (!expectedLength && HASH_LENGTHS.has(joined.length)) return joined;
+      }
       if (expectedLength) {
         const exact = tokens.find(token => token.length === expectedLength);
         if (exact) return exact;
@@ -2145,16 +2155,36 @@
       return known[0] || joined;
     }
 
+    const NAME_PATTERN = /sha-?3-?(?:224|256|384|512)|sha-?512[/-]?(?:224|256)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/gi;
+
+    // 紧跟在字母、数字、点、斜杠或连字符之后的名字多半是文件名的一部分（如 app.md5），不当作算法标记。
+    function findAlgorithmNames(line) {
+      return [...line.matchAll(NAME_PATTERN)].filter(found => found.index === 0 || !/[a-z0-9._/\\-]/i.test(line[found.index - 1]));
+    }
+
     function parseExpected(raw) {
       const lines = raw.split(/\r?\n/).map(line => line.trim()).filter(Boolean);
       if (!lines.length) return {entries: [], invalid: false};
       const entries = [];
       let invalid = false;
       lines.forEach(line => {
-        const found = line.match(/sha-?3-?(?:224|256|384|512)|sha-?512[/-]?(?:224|256)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/i);
-        const algorithm = found ? canonicalAlgorithm(found[0]) : null;
-        const expectedLength = algorithm ? ALGORITHMS.find(item => item.id === algorithm).bits / 4 : 0;
-        const hex = extractHex(found ? line.replace(found[0], ' ') : line, expectedLength);
+        let algorithm = null;
+        let hex = '';
+        for (const found of findAlgorithmNames(line)) {
+          const id = canonicalAlgorithm(found[0]);
+          const length = ALGORITHMS.find(item => item.id === id).bits / 4;
+          const value = extractHex(`${line.slice(0, found.index)} ${line.slice(found.index + found[0].length)}`, length);
+          if (!algorithm) {
+            algorithm = id;
+            hex = value;
+          }
+          if (value.length === length) {
+            algorithm = id;
+            hex = value;
+            break;
+          }
+        }
+        if (!algorithm) hex = extractHex(line, 0);
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
           invalid = true;
           return;
@@ -2170,10 +2200,15 @@
     }
 
     function rowComparison(result) {
-      const targets = expectedEntries.filter(entry => entryTargets(entry, result.algorithm, result.hex));
-      if (!targets.length) return null;
-      const matched = targets.some(entry => hexEqual(entry.hex, result.hex));
-      return matched ? 'match' : 'mismatch';
+      let verdict = null;
+      for (const entry of expectedEntries) {
+        if (!entryTargets(entry, result.algorithm, result.hex)) continue;
+        if (hexEqual(entry.hex, result.hex)) return 'match';
+        // 未标注算法的预期值只要被同长度的另一种算法命中，这一行就不算不一致。
+        if (!entry.algorithm && currentResults.some(other => other !== result && other.hex.length === entry.hex.length && hexEqual(other.hex, entry.hex))) continue;
+        verdict = 'mismatch';
+      }
+      return verdict;
     }
 
     function candidateAlgorithms() {
@@ -2251,12 +2286,17 @@
       expectedEntries.forEach(entry => {
         const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
         if (!targets.length) {
-          pending.push(entry.algorithm || `${entry.hex.length} 位哈希`);
+          const label = entry.algorithm || `${entry.hex.length} 位哈希`;
+          if (!pending.includes(label)) pending.push(label);
           return;
         }
         const hit = targets.find(result => hexEqual(result.hex, entry.hex));
-        if (hit) matched.push(hit.algorithm);
-        else mismatched.push(entry.algorithm || targets.map(result => result.algorithm).join(' / '));
+        const mismatchLabel = entry.algorithm || targets.map(result => result.algorithm).join(' / ');
+        if (hit) {
+          if (!matched.includes(hit.algorithm)) matched.push(hit.algorithm);
+        } else if (!mismatched.includes(mismatchLabel)) {
+          mismatched.push(mismatchLabel);
+        }
       });
 
       if (mismatched.length) {
@@ -2270,7 +2310,7 @@
         return;
       }
       if (pending.length && !matched.length) {
-        renderBanner('info', '还没有可比对的结果', `请计算 ${describeCandidates(missing)}。`);
+        renderBanner('info', '还没有可比对的结果', `请计算 ${describeCandidates(missing.length ? missing : pending)}。`);
         return;
       }
       if (pending.length) {
