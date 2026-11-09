@@ -2873,8 +2873,21 @@
     dropzone.addEventListener('drop', event => {
       event.preventDefault();
       dropzone.classList.remove('is-dragging');
-      if (event.dataTransfer && event.dataTransfer.files.length) setSelectedFile(event.dataTransfer.files[0]);
+      acceptDrop(event);
     });
+    function acceptDrop(event) {
+      const transfer = event.dataTransfer;
+      if (!transfer || !transfer.files.length) return;
+      const item = transfer.items && transfer.items[0];
+      const entry = item && typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
+      if (entry && entry.isDirectory) {
+        setStatus('不支持文件夹，请拖入单个文件。', 'error');
+        return;
+      }
+      setSelectedFile(transfer.files[0]);
+      if (transfer.files.length > 1) setStatus(`一次只能计算一个文件，已选择第一个，忽略其余 ${transfer.files.length - 1} 个。`);
+    }
+
     function hasFiles(event) {
       return Boolean(event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files'));
     }
@@ -2885,7 +2898,7 @@
       if (!hasFiles(event)) return;
       event.preventDefault();
       dropzone.classList.remove('is-dragging');
-      if (!dropzone.contains(event.target) && event.dataTransfer.files.length) setSelectedFile(event.dataTransfer.files[0]);
+      if (!dropzone.contains(event.target)) acceptDrop(event);
     });
     clearFileButton.addEventListener('click', () => setSelectedFile(null));
     computeButton.addEventListener('click', computeHashes);
