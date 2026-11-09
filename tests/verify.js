@@ -94,6 +94,27 @@ async function main() {
   flaky.arrayBuffer = () => Promise.reject(new Error('out of memory'));
   const fallback = await hashFile(flaky, ['SHA-256', 'MD5'], 1, () => {});
   fallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile fallback ${item.algorithm}`));
+  // 没有 Blob.arrayBuffer() 的旧浏览器应通过 FileReader 读取，结果保持一致。
+  globalThis.FileReader = class {
+    readAsArrayBuffer(blob) {
+      Blob.prototype.arrayBuffer.call(blob).then(
+        buffer => { this.result = buffer; this.onload(); },
+        error => { this.error = error; this.onerror(); }
+      );
+    }
+  };
+  const legacy = new Blob([buf]);
+  legacy.arrayBuffer = undefined;
+  legacy.slice = (start, end) => {
+    const part = Blob.prototype.slice.call(legacy, start, end);
+    part.arrayBuffer = undefined;
+    return part;
+  };
+  for (const streaming of [false, true]) {
+    const results = await hashFile(legacy, streaming ? ['MD5'] : ['SHA-256', 'MD5'], 1, () => {});
+    results.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile legacy ${item.algorithm}`));
+  }
+  delete globalThis.FileReader;
   console.log('ok    hashFile');
 
   const sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';

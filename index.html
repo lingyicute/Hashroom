@@ -2663,6 +2663,18 @@
       });
     }
 
+    // Safari 14 之前和部分 WebView 的 Blob 没有 arrayBuffer()，这时改用 FileReader。
+    function readBlob(blob) {
+      if (typeof blob.arrayBuffer === 'function') return blob.arrayBuffer();
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => reject(reader.error || new Error('Read failed'));
+        reader.onabort = () => reject(new Error('Read aborted'));
+        reader.readAsArrayBuffer(blob);
+      });
+    }
+
     async function digestBytesAsync(id, bytes, token, onProgress) {
       const hasher = createHasher(id);
       const step = 1024 * 1024;
@@ -2685,7 +2697,7 @@
       let bytes = null;
       if (useBuffer) {
         try {
-          bytes = new Uint8Array(await file.arrayBuffer());
+          bytes = new Uint8Array(await readBlob(file));
         } catch (error) {
           // 内存不足或一次性读取失败时，退回到分块流式处理。
           bytes = null;
@@ -2715,7 +2727,7 @@
       const hashers = ids.map(id => ({id, hasher: createHasher(id)}));
       const sliceSize = 1024 * 1024;
       const readSlice = offset => {
-        const pending = file.slice(offset, offset + sliceSize).arrayBuffer().then(buffer => new Uint8Array(buffer));
+        const pending = readBlob(file.slice(offset, offset + sliceSize)).then(buffer => new Uint8Array(buffer));
         pending.catch(() => {});
         return pending;
       };
