@@ -3077,6 +3077,10 @@
         option.classList.add('is-disabled');
         option.title = '自检未通过，已暂停使用';
       });
+      if (!selectedAlgorithms().length) {
+        const fallback = algorithmInputs.find(input => !input.disabled);
+        if (fallback) fallback.checked = true;
+      }
       refreshAlgorithmStyles();
       updateComputeButton();
       const names = ids.join('、');
@@ -3124,22 +3128,32 @@
         ['SHA-256', MSG112, 'cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1'],
         ['SHA-384', MSG112, '09330c33f71147e83d192fc782cd1b4753111b173b3b05d22fa08086e3b0f712fcc7c71a557e2db966c3e9fa91746039'],
         ['SHA-512', MSG112, '8e959b75dae313da8cf4f72814fc143f8f7779c6eb9f7fa17299aeadb6889018501d289e4900f7e4331b99dec4b5433ac7d329eeb6dd26545e96e55b874be909'],
+        ['SHA-512/224', MSG112, '23fec5bb94d60b23308192640b0c453335d664734fe40e7268674af9'],
+        ['SHA-512/256', MSG112, '3928e184fb8690f840da3988121d31be65cb9d3ef83ee6146feac861e19b563a'],
         ['SHA3-224', MSG112, '543e6868e1666c1a643630df77367ae5a62a85070a51c14cbf665cbc'],
         ['SHA3-256', MSG112, '916f6061fe879741ca6469b43971dfdb28b1a32dc36cb3254e812be27aad1d18'],
         ['SHA3-384', MSG112, '79407d3b5916b59c3e30b09822974791c313fb9ecc849e406f23592d04f625dc8c709b98b43b3852b337216179aa7fc7'],
         ['SHA3-512', MSG112, 'afebb2ef542e6579c50cad06d2e578f9f8dd6881d7dc824d26360feebf18a4fa73e3261122948efcfd492e74e82e2189ed0fb440d187f382270cb455f21dd185']
       ];
       const failed = new Set();
+      const encoder = new TextEncoder();
       vectors.forEach(([id, text, expected]) => {
-        const actual = digestBytes(id, new TextEncoder().encode(text));
-        if (actual !== expected) failed.add(id);
+        try {
+          if (digestBytes(id, encoder.encode(text)) !== expected) failed.add(id);
+        } catch (error) {
+          failed.add(id);
+        }
       });
-      const sample = new TextEncoder().encode(MSG112 + MSG56);
+      const sample = encoder.encode(MSG112 + MSG56);
       ALGORITHMS.forEach(item => {
-        const whole = digestBytes(item.id, sample);
-        const hasher = createHasher(item.id);
-        for (let offset = 0; offset < sample.length; offset += 7) hasher.update(sample.subarray(offset, offset + 7));
-        if (hasher.digest() !== whole) failed.add(item.id);
+        try {
+          const whole = digestBytes(item.id, sample);
+          const hasher = createHasher(item.id);
+          for (let offset = 0; offset < sample.length; offset += 7) hasher.update(sample.subarray(offset, offset + 7));
+          if (hasher.digest() !== whole) failed.add(item.id);
+        } catch (error) {
+          failed.add(item.id);
+        }
       });
       if (failed.size) disableAlgorithms([...failed]);
       else setStatus('算法自检通过', 'match');
