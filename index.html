@@ -474,6 +474,7 @@
       display: flex;
       align-items: center;
       gap: 17px;
+      pointer-events: none;
     }
 
     .drop-state {
@@ -2724,6 +2725,11 @@
       currentResults = [];
       lastElapsed = '';
       copyAllButton.disabled = true;
+      const previous = copyTimers.get(copyAllButton);
+      if (previous) clearTimeout(previous);
+      const icon = copyAllButton.querySelector('.copy-icon');
+      if (icon) icon.innerHTML = iconMarkup.copy;
+      copyAllButton.classList.remove('is-copied');
     }
 
     function onAlgorithmsChanged() {
@@ -3219,6 +3225,8 @@
     renderSwatches();
     renderMessage('还没有摘要', '选好文件并计算后，结果会显示在这里。');
     setTheme(document.documentElement.dataset.theme || 'light', false);
+    updateComparison();
+    updateComputeButton();
 
     dropzone.addEventListener('click', () => fileInput.click());
     fileInput.addEventListener('change', event => {
@@ -3233,6 +3241,7 @@
       if (!dropzone.contains(event.relatedTarget)) dropzone.classList.remove('is-dragging');
     });
     dropzone.addEventListener('drop', event => {
+      if (!hasFiles(event)) return;
       event.preventDefault();
       dropzone.classList.remove('is-dragging');
       acceptDrop(event);
@@ -3240,14 +3249,16 @@
     function acceptDrop(event) {
       const transfer = event.dataTransfer;
       if (!transfer || !transfer.files.length) return;
-      const item = transfer.items && transfer.items[0];
+      const item = transfer.items && [...transfer.items].find(entry => entry.kind === 'file');
       const entry = item && typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
       if (entry && entry.isDirectory) {
         setStatus('不支持文件夹，请拖入单个文件。', 'error');
         return;
       }
       setSelectedFile(transfer.files[0]);
-      if (transfer.files.length > 1) setStatus(`一次只能计算一个文件，已选择第一个，忽略其余 ${transfer.files.length - 1} 个。`);
+      if (transfer.files.length > 1 && selectedAlgorithms().length) {
+        setStatus(`一次只能计算一个文件，已选择第一个，忽略其余 ${transfer.files.length - 1} 个。`);
+      }
     }
 
     function hasFiles(event) {
@@ -3297,20 +3308,27 @@
       }
       expectedInput.focus();
     });
-    applySuggested.addEventListener('click', () => setCheckedAlgorithms(candidateAlgorithms(), false));
+    applySuggested.addEventListener('click', () => {
+      setCheckedAlgorithms(candidateAlgorithms(), false);
+      // 补选后按钮随即隐藏，把焦点交给下一步操作的控件。
+      (computeButton.disabled ? dropzone : computeButton).focus();
+    });
     copyAllButton.addEventListener('click', () => {
       if (!currentResults.length) return;
       copyText(currentResults.map(result => `${result.algorithm}: ${result.hex}`).join('\n'), copyAllButton, '已复制全部摘要');
     });
     // 单选组用方向键切换，选中的那个色块才在 Tab 顺序里。
     swatchList.addEventListener('keydown', event => {
-      const step = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[event.key];
-      if (!step) return;
       const buttons = [...swatchList.children];
       const index = buttons.indexOf(document.activeElement);
       if (index < 0) return;
+      const step = {ArrowRight: 1, ArrowDown: 1, ArrowLeft: -1, ArrowUp: -1}[event.key];
+      let nextIndex = step ? (index + step + buttons.length) % buttons.length : -1;
+      if (event.key === 'Home') nextIndex = 0;
+      else if (event.key === 'End') nextIndex = buttons.length - 1;
+      if (nextIndex < 0) return;
       event.preventDefault();
-      const next = buttons[(index + step + buttons.length) % buttons.length];
+      const next = buttons[nextIndex];
       setAccent(next.dataset.accent, true);
       next.focus();
     });
