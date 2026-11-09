@@ -2982,7 +2982,11 @@
         button.setAttribute('role', 'radio');
         button.setAttribute('aria-label', accent.label);
         button.title = accent.label;
-        button.addEventListener('click', () => setAccent(accent.id));
+        button.addEventListener('click', () => {
+          setAccent(accent.id);
+          // 菜单随即关闭，色块会消失，把焦点还给调色板按钮，键盘用户不会丢失位置。
+          paletteToggle.focus();
+        });
         swatchList.append(button);
       });
       updateSwatches();
