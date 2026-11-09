@@ -87,6 +87,11 @@ async function main() {
     const results = await hashFile(new Blob([buf]), ids, 1, () => {});
     results.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile ${item.algorithm}`));
   }
+  // 一次性读取失败时应退回到流式处理，结果保持一致。
+  const flaky = new Blob([buf]);
+  flaky.arrayBuffer = () => Promise.reject(new Error('out of memory'));
+  const fallback = await hashFile(flaky, ['SHA-256', 'MD5'], 1, () => {});
+  fallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile fallback ${item.algorithm}`));
   console.log('ok    hashFile');
 
   const sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';

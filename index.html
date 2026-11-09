@@ -2611,9 +2611,17 @@
     async function hashFile(file, ids, token, onProgress) {
       const subtle = window.crypto && crypto.subtle;
       const useBuffer = file.size <= BUFFER_LIMIT && subtle && ids.some(id => WEB_CRYPTO.has(id));
+      let bytes = null;
       if (useBuffer) {
-        const bytes = new Uint8Array(await file.arrayBuffer());
+        try {
+          bytes = new Uint8Array(await file.arrayBuffer());
+        } catch (error) {
+          // 内存不足或一次性读取失败时，退回到分块流式处理。
+          bytes = null;
+        }
         if (token !== runToken) return null;
+      }
+      if (bytes) {
         const results = [];
         for (let i = 0; i < ids.length; i += 1) {
           const id = ids[i];
