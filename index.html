@@ -1874,82 +1874,194 @@
       }
     }
 
-    const KECCAK_RHO = [1, 3, 6, 10, 15, 21, 28, 36, 45, 55, 2, 14, 27, 41, 56, 8, 25, 43, 62, 18, 39, 61, 20, 44];
-    const KECCAK_PI = [10, 7, 11, 17, 18, 3, 5, 16, 8, 21, 24, 4, 15, 23, 19, 13, 12, 2, 20, 14, 22, 9, 6, 1];
-    const KECCAK_RC = '0000000000000001 0000000000008082 800000000000808a 8000000080008000 000000000000808b 0000000080000001 8000000080008081 8000000000008009 000000000000008a 0000000000000088 0000000080008009 000000008000000a 000000008000808b 800000000000008b 8000000000008089 8000000000008003 8000000000008002 8000000000000080 000000000000800a 800000008000000a 8000000080008081 8000000000008080 0000000080000001 8000000080008008'.split(' ').map(hex => [parseInt(hex.slice(8), 16), parseInt(hex.slice(0, 8), 16)]);
+    // 状态用 Int32Array 保存：值始终是 32 位整数，比 Uint32Array 里的无符号数快得多。
+    // 每个 64 位 lane 拆成低、高两个 32 位字（state[2i]、state[2i+1]）。
+    const KECCAK_RC = Int32Array.from('0000000000000001 0000000000008082 800000000000808a 8000000080008000 000000000000808b 0000000080000001 8000000080008081 8000000000008009 000000000000008a 0000000000000088 0000000080008009 000000008000000a 000000008000808b 800000000000008b 8000000000008089 8000000000008003 8000000000008002 8000000000000080 000000000000800a 800000008000000a 8000000080008081 8000000000008080 0000000080000001 8000000080008008'.split(' ').flatMap(hex => [parseInt(hex.slice(8), 16), parseInt(hex.slice(0, 8), 16)]));
 
-    const KECCAK_ROT = new Uint32Array(2);
-    const KECCAK_C = new Uint32Array(10);
-    const KECCAK_D = new Uint32Array(10);
-    const KECCAK_ROW = new Uint32Array(10);
-
-    function rotlLane(lo, hi, bits) {
-      bits &= 63;
-      if (bits === 0) {
-        KECCAK_ROT[0] = lo;
-        KECCAK_ROT[1] = hi;
-      } else if (bits === 32) {
-        KECCAK_ROT[0] = hi;
-        KECCAK_ROT[1] = lo;
-      } else if (bits < 32) {
-        KECCAK_ROT[0] = (lo << bits) | (hi >>> (32 - bits));
-        KECCAK_ROT[1] = (hi << bits) | (lo >>> (32 - bits));
-      } else {
-        bits -= 32;
-        KECCAK_ROT[0] = (hi << bits) | (lo >>> (32 - bits));
-        KECCAK_ROT[1] = (lo << bits) | (hi >>> (32 - bits));
-      }
-    }
-
+    // Keccak-f[1600]：24 轮完全展开，lane 都放在局部变量里，避免数组间接访问和循环开销，
+    // 比逐 lane 的循环写法快数倍。ρ 的旋转量和 π 的换位已按标准表写死在代码里。
     function keccakF(state) {
-      const c = KECCAK_C;
-      const d = KECCAK_D;
-      const row = KECCAK_ROW;
-      for (let round = 0; round < 24; round += 1) {
-        for (let x = 0; x < 10; x += 2) {
-          c[x] = state[x] ^ state[x + 10] ^ state[x + 20] ^ state[x + 30] ^ state[x + 40];
-          c[x + 1] = state[x + 1] ^ state[x + 11] ^ state[x + 21] ^ state[x + 31] ^ state[x + 41];
-        }
-        for (let x = 0; x < 10; x += 2) {
-          const next = x === 8 ? 0 : x + 2;
-          const prev = x === 0 ? 8 : x - 2;
-          d[x] = c[prev] ^ ((c[next] << 1) | (c[next + 1] >>> 31));
-          d[x + 1] = c[prev + 1] ^ ((c[next + 1] << 1) | (c[next] >>> 31));
-        }
-        for (let i = 0; i < 50; i += 10) {
-          for (let x = 0; x < 10; x += 1) state[i + x] ^= d[x];
-        }
-        let lastLo = state[2];
-        let lastHi = state[3];
-        for (let i = 0; i < 24; i += 1) {
-          const pi = KECCAK_PI[i] * 2;
-          const curLo = state[pi];
-          const curHi = state[pi + 1];
-          rotlLane(lastLo, lastHi, KECCAK_RHO[i]);
-          state[pi] = KECCAK_ROT[0];
-          state[pi + 1] = KECCAK_ROT[1];
-          lastLo = curLo;
-          lastHi = curHi;
-        }
-        for (let base = 0; base < 50; base += 10) {
-          for (let x = 0; x < 10; x += 1) row[x] = state[base + x];
-          for (let x = 0; x < 10; x += 2) {
-            const one = x === 8 ? 0 : x + 2;
-            const two = one === 8 ? 0 : one + 2;
-            state[base + x] = row[x] ^ (~row[one] & row[two]);
-            state[base + x + 1] = row[x + 1] ^ (~row[one + 1] & row[two + 1]);
-          }
-        }
-        state[0] ^= KECCAK_RC[round][0];
-        state[1] ^= KECCAK_RC[round][1];
+      let l0 = state[0], h0 = state[1],
+          l1 = state[2], h1 = state[3],
+          l2 = state[4], h2 = state[5],
+          l3 = state[6], h3 = state[7],
+          l4 = state[8], h4 = state[9],
+          l5 = state[10], h5 = state[11],
+          l6 = state[12], h6 = state[13],
+          l7 = state[14], h7 = state[15],
+          l8 = state[16], h8 = state[17],
+          l9 = state[18], h9 = state[19],
+          l10 = state[20], h10 = state[21],
+          l11 = state[22], h11 = state[23],
+          l12 = state[24], h12 = state[25],
+          l13 = state[26], h13 = state[27],
+          l14 = state[28], h14 = state[29],
+          l15 = state[30], h15 = state[31],
+          l16 = state[32], h16 = state[33],
+          l17 = state[34], h17 = state[35],
+          l18 = state[36], h18 = state[37],
+          l19 = state[38], h19 = state[39],
+          l20 = state[40], h20 = state[41],
+          l21 = state[42], h21 = state[43],
+          l22 = state[44], h22 = state[45],
+          l23 = state[46], h23 = state[47],
+          l24 = state[48], h24 = state[49];
+      for (let round = 0; round < 48; round += 2) {
+        // θ：列奇偶校验 c，再把 d 异或回每个 lane。
+        const c0l = l0 ^ l5 ^ l10 ^ l15 ^ l20;
+        const c0h = h0 ^ h5 ^ h10 ^ h15 ^ h20;
+        const c1l = l1 ^ l6 ^ l11 ^ l16 ^ l21;
+        const c1h = h1 ^ h6 ^ h11 ^ h16 ^ h21;
+        const c2l = l2 ^ l7 ^ l12 ^ l17 ^ l22;
+        const c2h = h2 ^ h7 ^ h12 ^ h17 ^ h22;
+        const c3l = l3 ^ l8 ^ l13 ^ l18 ^ l23;
+        const c3h = h3 ^ h8 ^ h13 ^ h18 ^ h23;
+        const c4l = l4 ^ l9 ^ l14 ^ l19 ^ l24;
+        const c4h = h4 ^ h9 ^ h14 ^ h19 ^ h24;
+        const d0l = c4l ^ ((c1l << 1) | (c1h >>> 31));
+        const d0h = c4h ^ ((c1h << 1) | (c1l >>> 31));
+        const d1l = c0l ^ ((c2l << 1) | (c2h >>> 31));
+        const d1h = c0h ^ ((c2h << 1) | (c2l >>> 31));
+        const d2l = c1l ^ ((c3l << 1) | (c3h >>> 31));
+        const d2h = c1h ^ ((c3h << 1) | (c3l >>> 31));
+        const d3l = c2l ^ ((c4l << 1) | (c4h >>> 31));
+        const d3h = c2h ^ ((c4h << 1) | (c4l >>> 31));
+        const d4l = c3l ^ ((c0l << 1) | (c0h >>> 31));
+        const d4h = c3h ^ ((c0h << 1) | (c0l >>> 31));
+        // ρ 与 π：旋转后搬到新位置（lane 0 不动）。
+        const b0l = l0 ^ d0l, b0h = h0 ^ d0h;
+        const b10l = ((l1 ^ d1l) << 1) | ((h1 ^ d1h) >>> 31);
+        const b10h = ((h1 ^ d1h) << 1) | ((l1 ^ d1l) >>> 31);
+        const b7l = ((l10 ^ d0l) << 3) | ((h10 ^ d0h) >>> 29);
+        const b7h = ((h10 ^ d0h) << 3) | ((l10 ^ d0l) >>> 29);
+        const b11l = ((l7 ^ d2l) << 6) | ((h7 ^ d2h) >>> 26);
+        const b11h = ((h7 ^ d2h) << 6) | ((l7 ^ d2l) >>> 26);
+        const b17l = ((l11 ^ d1l) << 10) | ((h11 ^ d1h) >>> 22);
+        const b17h = ((h11 ^ d1h) << 10) | ((l11 ^ d1l) >>> 22);
+        const b18l = ((l17 ^ d2l) << 15) | ((h17 ^ d2h) >>> 17);
+        const b18h = ((h17 ^ d2h) << 15) | ((l17 ^ d2l) >>> 17);
+        const b3l = ((l18 ^ d3l) << 21) | ((h18 ^ d3h) >>> 11);
+        const b3h = ((h18 ^ d3h) << 21) | ((l18 ^ d3l) >>> 11);
+        const b5l = ((l3 ^ d3l) << 28) | ((h3 ^ d3h) >>> 4);
+        const b5h = ((h3 ^ d3h) << 28) | ((l3 ^ d3l) >>> 4);
+        const b16l = ((h5 ^ d0h) << 4) | ((l5 ^ d0l) >>> 28);
+        const b16h = ((l5 ^ d0l) << 4) | ((h5 ^ d0h) >>> 28);
+        const b8l = ((h16 ^ d1h) << 13) | ((l16 ^ d1l) >>> 19);
+        const b8h = ((l16 ^ d1l) << 13) | ((h16 ^ d1h) >>> 19);
+        const b21l = ((h8 ^ d3h) << 23) | ((l8 ^ d3l) >>> 9);
+        const b21h = ((l8 ^ d3l) << 23) | ((h8 ^ d3h) >>> 9);
+        const b24l = ((l21 ^ d1l) << 2) | ((h21 ^ d1h) >>> 30);
+        const b24h = ((h21 ^ d1h) << 2) | ((l21 ^ d1l) >>> 30);
+        const b4l = ((l24 ^ d4l) << 14) | ((h24 ^ d4h) >>> 18);
+        const b4h = ((h24 ^ d4h) << 14) | ((l24 ^ d4l) >>> 18);
+        const b15l = ((l4 ^ d4l) << 27) | ((h4 ^ d4h) >>> 5);
+        const b15h = ((h4 ^ d4h) << 27) | ((l4 ^ d4l) >>> 5);
+        const b23l = ((h15 ^ d0h) << 9) | ((l15 ^ d0l) >>> 23);
+        const b23h = ((l15 ^ d0l) << 9) | ((h15 ^ d0h) >>> 23);
+        const b19l = ((h23 ^ d3h) << 24) | ((l23 ^ d3l) >>> 8);
+        const b19h = ((l23 ^ d3l) << 24) | ((h23 ^ d3h) >>> 8);
+        const b13l = ((l19 ^ d4l) << 8) | ((h19 ^ d4h) >>> 24);
+        const b13h = ((h19 ^ d4h) << 8) | ((l19 ^ d4l) >>> 24);
+        const b12l = ((l13 ^ d3l) << 25) | ((h13 ^ d3h) >>> 7);
+        const b12h = ((h13 ^ d3h) << 25) | ((l13 ^ d3l) >>> 7);
+        const b2l = ((h12 ^ d2h) << 11) | ((l12 ^ d2l) >>> 21);
+        const b2h = ((l12 ^ d2l) << 11) | ((h12 ^ d2h) >>> 21);
+        const b20l = ((h2 ^ d2h) << 30) | ((l2 ^ d2l) >>> 2);
+        const b20h = ((l2 ^ d2l) << 30) | ((h2 ^ d2h) >>> 2);
+        const b14l = ((l20 ^ d0l) << 18) | ((h20 ^ d0h) >>> 14);
+        const b14h = ((h20 ^ d0h) << 18) | ((l20 ^ d0l) >>> 14);
+        const b22l = ((h14 ^ d4h) << 7) | ((l14 ^ d4l) >>> 25);
+        const b22h = ((l14 ^ d4l) << 7) | ((h14 ^ d4h) >>> 25);
+        const b9l = ((h22 ^ d2h) << 29) | ((l22 ^ d2l) >>> 3);
+        const b9h = ((l22 ^ d2l) << 29) | ((h22 ^ d2h) >>> 3);
+        const b6l = ((l9 ^ d4l) << 20) | ((h9 ^ d4h) >>> 12);
+        const b6h = ((h9 ^ d4h) << 20) | ((l9 ^ d4l) >>> 12);
+        const b1l = ((h6 ^ d1h) << 12) | ((l6 ^ d1l) >>> 20);
+        const b1h = ((l6 ^ d1l) << 12) | ((h6 ^ d1h) >>> 20);
+        // χ：每一行内的非线性混合，ι：加轮常数。
+        l0 = b0l ^ (~b1l & b2l) ^ KECCAK_RC[round];
+        h0 = b0h ^ (~b1h & b2h) ^ KECCAK_RC[round + 1];
+        l1 = b1l ^ (~b2l & b3l);
+        h1 = b1h ^ (~b2h & b3h);
+        l2 = b2l ^ (~b3l & b4l);
+        h2 = b2h ^ (~b3h & b4h);
+        l3 = b3l ^ (~b4l & b0l);
+        h3 = b3h ^ (~b4h & b0h);
+        l4 = b4l ^ (~b0l & b1l);
+        h4 = b4h ^ (~b0h & b1h);
+        l5 = b5l ^ (~b6l & b7l);
+        h5 = b5h ^ (~b6h & b7h);
+        l6 = b6l ^ (~b7l & b8l);
+        h6 = b6h ^ (~b7h & b8h);
+        l7 = b7l ^ (~b8l & b9l);
+        h7 = b7h ^ (~b8h & b9h);
+        l8 = b8l ^ (~b9l & b5l);
+        h8 = b8h ^ (~b9h & b5h);
+        l9 = b9l ^ (~b5l & b6l);
+        h9 = b9h ^ (~b5h & b6h);
+        l10 = b10l ^ (~b11l & b12l);
+        h10 = b10h ^ (~b11h & b12h);
+        l11 = b11l ^ (~b12l & b13l);
+        h11 = b11h ^ (~b12h & b13h);
+        l12 = b12l ^ (~b13l & b14l);
+        h12 = b12h ^ (~b13h & b14h);
+        l13 = b13l ^ (~b14l & b10l);
+        h13 = b13h ^ (~b14h & b10h);
+        l14 = b14l ^ (~b10l & b11l);
+        h14 = b14h ^ (~b10h & b11h);
+        l15 = b15l ^ (~b16l & b17l);
+        h15 = b15h ^ (~b16h & b17h);
+        l16 = b16l ^ (~b17l & b18l);
+        h16 = b16h ^ (~b17h & b18h);
+        l17 = b17l ^ (~b18l & b19l);
+        h17 = b17h ^ (~b18h & b19h);
+        l18 = b18l ^ (~b19l & b15l);
+        h18 = b18h ^ (~b19h & b15h);
+        l19 = b19l ^ (~b15l & b16l);
+        h19 = b19h ^ (~b15h & b16h);
+        l20 = b20l ^ (~b21l & b22l);
+        h20 = b20h ^ (~b21h & b22h);
+        l21 = b21l ^ (~b22l & b23l);
+        h21 = b21h ^ (~b22h & b23h);
+        l22 = b22l ^ (~b23l & b24l);
+        h22 = b22h ^ (~b23h & b24h);
+        l23 = b23l ^ (~b24l & b20l);
+        h23 = b23h ^ (~b24h & b20h);
+        l24 = b24l ^ (~b20l & b21l);
+        h24 = b24h ^ (~b20h & b21h);
       }
+      state[0] = l0; state[1] = h0;
+      state[2] = l1; state[3] = h1;
+      state[4] = l2; state[5] = h2;
+      state[6] = l3; state[7] = h3;
+      state[8] = l4; state[9] = h4;
+      state[10] = l5; state[11] = h5;
+      state[12] = l6; state[13] = h6;
+      state[14] = l7; state[15] = h7;
+      state[16] = l8; state[17] = h8;
+      state[18] = l9; state[19] = h9;
+      state[20] = l10; state[21] = h10;
+      state[22] = l11; state[23] = h11;
+      state[24] = l12; state[25] = h12;
+      state[26] = l13; state[27] = h13;
+      state[28] = l14; state[29] = h14;
+      state[30] = l15; state[31] = h15;
+      state[32] = l16; state[33] = h16;
+      state[34] = l17; state[35] = h17;
+      state[36] = l18; state[37] = h18;
+      state[38] = l19; state[39] = h19;
+      state[40] = l20; state[41] = h20;
+      state[42] = l21; state[43] = h21;
+      state[44] = l22; state[45] = h22;
+      state[46] = l23; state[47] = h23;
+      state[48] = l24; state[49] = h24;
     }
 
     class Sha3 {
       constructor(rate, outLen) {
         this.rate = rate;
         this.outLen = outLen;
-        this.lanes = new Uint32Array(50);
+        this.lanes = new Int32Array(50);
         this.offset = 0;
       }
 
