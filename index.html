@@ -2257,7 +2257,8 @@
     }
 
     function hexTokens(line) {
-      const text = line.replace(/(?<![a-z0-9_])0x(?=[0-9a-f])/gi, '');
+      // 不用后行断言：Safari 16.4 之前不支持，正则字面量会让整段脚本解析失败、页面完全不可用。
+      const text = line.replace(/(^|[^a-z0-9_])0x(?=[0-9a-f])/gi, '$1');
       const found = [...text.matchAll(/[0-9a-fA-F]+/g)].filter(item => {
         const before = item.index > 0 ? text[item.index - 1] : '';
         const after = text.slice(item.index + item[0].length);
