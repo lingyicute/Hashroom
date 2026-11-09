@@ -1411,6 +1411,7 @@
 
     const WEB_CRYPTO = new Set(['SHA-1', 'SHA-256', 'SHA-384', 'SHA-512']);
     const BUFFER_LIMIT = 256 * 1024 * 1024;
+    const DROPZONE_LABEL = '拖放文件到这里，或点击选择文件';
     const HASH_LENGTHS = new Set(ALGORITHMS.map(item => item.bits / 4));
 
     const fileInput = document.getElementById('fileInput');
@@ -2715,6 +2716,7 @@
         clearFileButton.hidden = true;
         fileName.textContent = '';
         fileMeta.textContent = '';
+        dropzone.setAttribute('aria-label', DROPZONE_LABEL);
         setStatus('尚未选择文件');
         renderMessage('还没有摘要', '选好文件并计算后，结果会显示在这里。');
         return;
@@ -2724,6 +2726,8 @@
       clearFileButton.hidden = false;
       fileName.textContent = selectedFile.name;
       fileMeta.textContent = describeFile(selectedFile);
+      // 按钮的 aria-label 会盖掉内部文字，读屏软件需要在标签里听到文件名。
+      dropzone.setAttribute('aria-label', `已选择文件 ${selectedFile.name}，${fileMeta.textContent}。点击更换文件`);
       setStatus(selectedAlgorithms().length ? '文件已就绪，可以开始计算。' : '请至少选择一种算法。', selectedAlgorithms().length ? '' : 'error');
       renderMessage('文件已就绪', hasExpectedValue() ? '计算后会立即与预期值比对。' : '点击计算后，所选摘要会显示在这里。');
     }
