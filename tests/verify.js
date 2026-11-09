@@ -207,6 +207,12 @@ async function main() {
   assert.strictEqual(entriesForFile(list.entries, 'other.iso').ignored, 3);
   assert.strictEqual(entriesForFile(list.entries, 'missing.iso').ignored, 0);
   assert.strictEqual(entriesForFile(list.entries, '').entries.length, 5);
+  // 超长的行不能拖慢解析（输入框每次改动都会重新解析）。
+  const started = performance.now();
+  const hostile = parseExpected(`${'sha256 '.repeat(20000)}\n${'ab '.repeat(40000)}\n${sha256}  ok.iso`);
+  assert.ok(performance.now() - started < 1000, '超长行解析太慢');
+  assert.strictEqual(hostile.entries.length, 1);
+  assert.strictEqual(hostile.invalidLines, 2);
   console.log('ok    parseExpected');
 }
 

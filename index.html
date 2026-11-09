@@ -2313,6 +2313,11 @@
       return best;
     }
 
+    // 真正的校验行不会很长；输入框每次改动都要重新解析，超长的行（比如误粘贴了整个文件）直接当作无法识别，
+    // 免得在上面反复扫描拖慢页面。同一行也只看前几个算法名。
+    const MAX_LINE_LENGTH = 2048;
+    const MAX_NAMES_PER_LINE = 8;
+
     const NAME_PATTERN = /sha-?(?:2-?)?512[/-]?(?:224|256)|sha-?[23]-?(?:224|256|384|512)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/gi;
 
     // 紧跟在字母、数字、点或斜杠之后的名字多半是文件名的一部分（如 app.md5），
@@ -2372,9 +2377,13 @@
       let invalidLines = 0;
       let strayLength = 0;
       lines.forEach(line => {
+        if (line.length > MAX_LINE_LENGTH) {
+          invalidLines += 1;
+          return;
+        }
         let algorithm = null;
         let hex = '';
-        for (const found of findAlgorithmNames(line)) {
+        for (const found of findAlgorithmNames(line).slice(0, MAX_NAMES_PER_LINE)) {
           const id = canonicalAlgorithm(found[0]);
           const length = ALGORITHMS.find(item => item.id === id).bits / 4;
           const rest = `${line.slice(0, found.index)} ${line.slice(found.index + found[0].length)}`;
