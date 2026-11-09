@@ -2660,6 +2660,15 @@
       computeLabel.textContent = isCalculating ? '取消计算' : (hasExpectedValue() ? '计算并比对' : '计算哈希');
       computeIcon.hidden = isCalculating;
       buttonSpinner.hidden = !isCalculating;
+      // 只在计算期间挂上离开确认：Firefox 不会把带 beforeunload 监听的页面放进往返缓存（bfcache）。
+      if (isCalculating) window.addEventListener('beforeunload', confirmLeave);
+      else window.removeEventListener('beforeunload', confirmLeave);
+    }
+
+    // 大文件算到一半时误关标签页或刷新会前功尽弃，计算期间让浏览器先确认一下。
+    function confirmLeave(event) {
+      event.preventDefault();
+      event.returnValue = '';
     }
 
     function renderMessage(title, description, kind = 'empty', progress = 0) {
@@ -3315,12 +3324,6 @@
       dropzone.focus();
     });
     computeButton.addEventListener('click', computeHashes);
-    // 大文件算到一半时误关标签页或刷新会前功尽弃，计算期间让浏览器先确认一下。
-    window.addEventListener('beforeunload', event => {
-      if (!isCalculating) return;
-      event.preventDefault();
-      event.returnValue = '';
-    });
     document.getElementById('selectCommon').addEventListener('click', () => {
       setCheckedAlgorithms(ALGORITHMS.filter(item => item.group === 'common').map(item => item.id), true);
     });
