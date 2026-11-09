@@ -2676,6 +2676,16 @@
       return hashers.map(item => ({algorithm: item.id, hex: item.hasher.digest()}));
     }
 
+    // 结果已经显示时，状态栏跟随最新的比对结论，不留下过时的信息。
+    function reportOutcome() {
+      const verdict = compareBanner.querySelector('strong');
+      if (hasExpectedValue() && verdict && !compareBanner.hidden) {
+        setStatus(verdict.textContent, compareBanner.classList.contains('is-match') ? 'match' : compareBanner.classList.contains('is-mismatch') ? 'error' : '');
+      } else {
+        setStatus(`已完成 ${currentResults.length} 种摘要计算。`, 'match');
+      }
+    }
+
     async function computeHashes() {
       if (!selectedFile || isCalculating) return;
       const ids = selectedAlgorithms();
@@ -2706,9 +2716,7 @@
         if (!results || token !== runToken) return;
         renderResults(results);
         updateComparison();
-        const verdict = compareBanner.querySelector('strong');
-        if (hasExpectedValue() && verdict) setStatus(verdict.textContent, compareBanner.classList.contains('is-match') ? 'match' : compareBanner.classList.contains('is-mismatch') ? 'error' : '');
-        else setStatus(`已完成 ${results.length} 种摘要计算。`, 'match');
+        reportOutcome();
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
           resultsSection.scrollIntoView({behavior: 'smooth', block: 'nearest'});
         }
@@ -2954,13 +2962,19 @@
     expectedInput.addEventListener('input', () => {
       updateComparison();
       updateComputeButton();
-      if (currentResults.length) renderResults(currentResults, false);
+      if (currentResults.length) {
+        renderResults(currentResults, false);
+        reportOutcome();
+      }
     });
     clearExpected.addEventListener('click', () => {
       expectedInput.value = '';
       updateComparison();
       updateComputeButton();
-      if (currentResults.length) renderResults(currentResults, false);
+      if (currentResults.length) {
+        renderResults(currentResults, false);
+        reportOutcome();
+      }
       expectedInput.focus();
     });
     applySuggested.addEventListener('click', () => setCheckedAlgorithms(candidateAlgorithms(), false));
