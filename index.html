@@ -2761,6 +2761,18 @@
       dropzone.classList.remove('is-dragging');
       if (event.dataTransfer && event.dataTransfer.files.length) setSelectedFile(event.dataTransfer.files[0]);
     });
+    function hasFiles(event) {
+      return Boolean(event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files'));
+    }
+    window.addEventListener('dragover', event => {
+      if (hasFiles(event)) event.preventDefault();
+    });
+    window.addEventListener('drop', event => {
+      if (!hasFiles(event)) return;
+      event.preventDefault();
+      dropzone.classList.remove('is-dragging');
+      if (!dropzone.contains(event.target) && event.dataTransfer.files.length) setSelectedFile(event.dataTransfer.files[0]);
+    });
     clearFileButton.addEventListener('click', () => setSelectedFile(null));
     computeButton.addEventListener('click', computeHashes);
     document.getElementById('selectCommon').addEventListener('click', () => {
