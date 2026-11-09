@@ -1744,93 +1744,79 @@
 
       process(block, offset) {
         const w = this.w;
-        for (let i = 0; i < 16; i += 1) {
-          w[i * 2] = readU32BE(block, offset + i * 8);
-          w[i * 2 + 1] = readU32BE(block, offset + i * 8 + 4);
-        }
+        const H = this.h;
+        for (let i = 0; i < 32; i += 1) w[i] = readU32BE(block, offset + i * 4);
         for (let i = 16; i < 80; i += 1) {
-          const ahi = w[(i - 15) * 2];
-          const alo = w[(i - 15) * 2 + 1];
-          const bhi = w[(i - 2) * 2];
-          const blo = w[(i - 2) * 2 + 1];
-          const s0hi = (rotrHi(ahi, alo, 1) ^ rotrHi(ahi, alo, 8) ^ shrHi(ahi, 7)) >>> 0;
-          const s0lo = (rotrLo(ahi, alo, 1) ^ rotrLo(ahi, alo, 8) ^ shrLo(ahi, alo, 7)) >>> 0;
-          const s1hi = (rotrHi(bhi, blo, 19) ^ rotrHi(bhi, blo, 61) ^ shrHi(bhi, 6)) >>> 0;
-          const s1lo = (rotrLo(bhi, blo, 19) ^ rotrLo(bhi, blo, 61) ^ shrLo(bhi, blo, 6)) >>> 0;
-          const p15hi = w[(i - 16) * 2];
-          const p15lo = w[(i - 16) * 2 + 1];
-          const p7hi = w[(i - 7) * 2];
-          const p7lo = w[(i - 7) * 2 + 1];
-          let lo = (p15lo + s0lo) >>> 0;
-          let hi = (p15hi + s0hi + (lo < p15lo ? 1 : 0)) >>> 0;
-          const lo2 = (lo + p7lo) >>> 0;
-          hi = (hi + p7hi + (lo2 < lo ? 1 : 0)) >>> 0;
-          lo = lo2;
-          const lo3 = (lo + s1lo) >>> 0;
-          w[i * 2] = (hi + s1hi + (lo3 < lo ? 1 : 0)) >>> 0;
-          w[i * 2 + 1] = lo3;
+          const j = i * 2;
+          const xh = w[j - 30];
+          const xl = w[j - 29];
+          const yh = w[j - 4];
+          const yl = w[j - 3];
+          const s0h = ((xh >>> 1) | (xl << 31)) ^ ((xh >>> 8) | (xl << 24)) ^ (xh >>> 7);
+          const s0l = ((xl >>> 1) | (xh << 31)) ^ ((xl >>> 8) | (xh << 24)) ^ ((xl >>> 7) | (xh << 25));
+          const s1h = ((yh >>> 19) | (yl << 13)) ^ ((yl >>> 29) | (yh << 3)) ^ (yh >>> 6);
+          const s1l = ((yl >>> 19) | (yh << 13)) ^ ((yh >>> 29) | (yl << 3)) ^ ((yl >>> 6) | (yh << 26));
+          const lo = w[j - 31] + (s0l >>> 0) + w[j - 13] + (s1l >>> 0);
+          const hi = w[j - 32] + (s0h >>> 0) + w[j - 14] + (s1h >>> 0) + ((lo / 4294967296) | 0);
+          w[j] = hi;
+          w[j + 1] = lo;
         }
-        const v = this.h.slice();
+        let ah = H[0];
+        let al = H[1];
+        let bh = H[2];
+        let bl = H[3];
+        let ch = H[4];
+        let cl = H[5];
+        let dh = H[6];
+        let dl = H[7];
+        let eh = H[8];
+        let el = H[9];
+        let fh = H[10];
+        let fl = H[11];
+        let gh = H[12];
+        let gl = H[13];
+        let hh = H[14];
+        let hl = H[15];
         for (let i = 0; i < 80; i += 1) {
-          const ehi = v[8];
-          const elo = v[9];
-          const fhi = v[10];
-          const flo = v[11];
-          const ghi = v[12];
-          const glo = v[13];
-          const ahi = v[0];
-          const alo = v[1];
-          const bhi = v[2];
-          const blo = v[3];
-          const chi = v[4];
-          const clo = v[5];
-          const s1hi = (rotrHi(ehi, elo, 14) ^ rotrHi(ehi, elo, 18) ^ rotrHi(ehi, elo, 41)) >>> 0;
-          const s1lo = (rotrLo(ehi, elo, 14) ^ rotrLo(ehi, elo, 18) ^ rotrLo(ehi, elo, 41)) >>> 0;
-          const chhi = ((ehi & fhi) ^ (~ehi & ghi)) >>> 0;
-          const chlo = ((elo & flo) ^ (~elo & glo)) >>> 0;
-          const s0hi = (rotrHi(ahi, alo, 28) ^ rotrHi(ahi, alo, 34) ^ rotrHi(ahi, alo, 39)) >>> 0;
-          const s0lo = (rotrLo(ahi, alo, 28) ^ rotrLo(ahi, alo, 34) ^ rotrLo(ahi, alo, 39)) >>> 0;
-          const majhi = ((ahi & bhi) ^ (ahi & chi) ^ (bhi & chi)) >>> 0;
-          const majlo = ((alo & blo) ^ (alo & clo) ^ (blo & clo)) >>> 0;
-          const parts = [
-            [v[14], v[15]],
-            [s1hi, s1lo],
-            [chhi, chlo],
-            [K512[i * 2], K512[i * 2 + 1]],
-            [w[i * 2], w[i * 2 + 1]]
-          ];
-          let t1hi = 0;
-          let t1lo = 0;
-          parts.forEach(part => {
-            const nextLo = (t1lo + part[1]) >>> 0;
-            t1hi = (t1hi + part[0] + (nextLo < t1lo ? 1 : 0)) >>> 0;
-            t1lo = nextLo;
-          });
-          const t2lo = (s0lo + majlo) >>> 0;
-          const t2hi = (s0hi + majhi + (t2lo < s0lo ? 1 : 0)) >>> 0;
-          v[14] = v[12];
-          v[15] = v[13];
-          v[12] = v[10];
-          v[13] = v[11];
-          v[10] = v[8];
-          v[11] = v[9];
-          const elo2 = (v[7] + t1lo) >>> 0;
-          v[8] = (v[6] + t1hi + (elo2 < v[7] ? 1 : 0)) >>> 0;
-          v[9] = elo2;
-          v[6] = v[4];
-          v[7] = v[5];
-          v[4] = v[2];
-          v[5] = v[3];
-          v[2] = v[0];
-          v[3] = v[1];
-          const alo2 = (t1lo + t2lo) >>> 0;
-          v[0] = (t1hi + t2hi + (alo2 < t1lo ? 1 : 0)) >>> 0;
-          v[1] = alo2;
+          const j = i * 2;
+          const S1h = ((eh >>> 14) | (el << 18)) ^ ((eh >>> 18) | (el << 14)) ^ ((el >>> 9) | (eh << 23));
+          const S1l = ((el >>> 14) | (eh << 18)) ^ ((el >>> 18) | (eh << 14)) ^ ((eh >>> 9) | (el << 23));
+          const chh = (eh & fh) ^ (~eh & gh);
+          const chl = (el & fl) ^ (~el & gl);
+          const t1sum = hl + (S1l >>> 0) + (chl >>> 0) + K512[j + 1] + w[j + 1];
+          const t1l = t1sum >>> 0;
+          const t1h = (hh + (S1h >>> 0) + (chh >>> 0) + K512[j] + w[j] + ((t1sum / 4294967296) | 0)) >>> 0;
+          const S0h = ((ah >>> 28) | (al << 4)) ^ ((al >>> 2) | (ah << 30)) ^ ((al >>> 7) | (ah << 25));
+          const S0l = ((al >>> 28) | (ah << 4)) ^ ((ah >>> 2) | (al << 30)) ^ ((ah >>> 7) | (al << 25));
+          const majh = (ah & bh) ^ (ah & ch) ^ (bh & ch);
+          const majl = (al & bl) ^ (al & cl) ^ (bl & cl);
+          const t2sum = (S0l >>> 0) + (majl >>> 0);
+          const t2l = t2sum >>> 0;
+          const t2h = ((S0h >>> 0) + (majh >>> 0) + ((t2sum / 4294967296) | 0)) >>> 0;
+          hh = gh;
+          hl = gl;
+          gh = fh;
+          gl = fl;
+          fh = eh;
+          fl = el;
+          const esum = dl + t1l;
+          el = esum >>> 0;
+          eh = (dh + t1h + ((esum / 4294967296) | 0)) >>> 0;
+          dh = ch;
+          dl = cl;
+          ch = bh;
+          cl = bl;
+          bh = ah;
+          bl = al;
+          const asum = t1l + t2l;
+          al = asum >>> 0;
+          ah = (t1h + t2h + ((asum / 4294967296) | 0)) >>> 0;
         }
-        for (let i = 0; i < 8; i += 1) {
-          const lo = (this.h[i * 2 + 1] + v[i * 2 + 1]) >>> 0;
-          this.h[i * 2] = (this.h[i * 2] + v[i * 2] + (lo < this.h[i * 2 + 1] ? 1 : 0)) >>> 0;
-          this.h[i * 2 + 1] = lo;
+        const v = [ah, al, bh, bl, ch, cl, dh, dl, eh, el, fh, fl, gh, gl, hh, hl];
+        for (let i = 0; i < 16; i += 2) {
+          const sum = H[i + 1] + v[i + 1];
+          H[i] = H[i] + v[i] + ((sum / 4294967296) | 0);
+          H[i + 1] = sum;
         }
       }
 
@@ -1838,7 +1824,6 @@
         this.finish(16, false);
         const out = new Uint8Array(this.outBytes);
         for (let i = 0; i < this.outBytes; i += 1) {
-          const word = this.h[(i >> 2) < 2 ? i >> 2 : Math.floor(i / 4)];
           out[i] = (this.h[Math.floor(i / 4)] >>> ((3 - (i % 4)) * 8)) & 255;
         }
         return bytesToHex(out);
