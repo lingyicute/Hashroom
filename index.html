@@ -2362,12 +2362,16 @@
 
     // 从 sha256sum（“哈希  文件名”“哈希 *文件名”）和 BSD（“SHA256 (文件名) = 哈希”）的输出里拆出文件名，
     // 既让整份校验清单只比对当前文件，也避免括号或末尾的文件名干扰算法和哈希识别。
-    // 以反斜杠开头的行（coreutils 转义过文件名）认不出文件名，照常参与比对。
+    // 文件名含反斜杠或换行时，coreutils 会转义文件名并在行首加一个反斜杠（两种格式都会）：
+    // 这种行认不出文件名，去掉行首的反斜杠后照常参与比对。
     function splitChecksumLine(line) {
-      const bsd = line.match(/^([A-Za-z][\w/-]*)\s*\((.+)\)\s*=\s*(\S.*)$/);
-      if (bsd) return {content: `${bsd[1]} = ${bsd[3]}`, file: bsd[2].trim().split(/[\\/]/).pop()};
-      const sum = line.match(/^((?:\w+sum\s+)?([0-9a-fA-F]{8,128}))(?: [ *])(.+)$/);
-      if (sum && HASH_LENGTHS.has(sum[2].length)) return {content: sum[1], file: sum[3].trim().split(/[\\/]/).pop()};
+      const escaped = line.startsWith('\\');
+      const text = escaped ? line.slice(1) : line;
+      const baseName = name => (escaped ? '' : name.trim().split(/[\\/]/).pop());
+      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\((.+)\)\s*=\s*(\S.*)$/);
+      if (bsd) return {content: `${bsd[1]} = ${bsd[3]}`, file: baseName(bsd[2])};
+      const sum = text.match(/^((?:\w+sum\s+)?([0-9a-fA-F]{8,128}))(?: [ *])(.+)$/);
+      if (sum && HASH_LENGTHS.has(sum[2].length)) return {content: sum[1], file: baseName(sum[3])};
       return {content: line, file: ''};
     }
 

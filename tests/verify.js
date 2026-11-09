@@ -176,6 +176,11 @@ async function main() {
     assert.strictEqual(parsed.entries[0].hex.length, length, line);
   });
   assert.strictEqual(parseExpected('CRC32 (deadbeef) = cbf43926').entries[0].hex, 'cbf43926');
+  // coreutils 转义过文件名的行（行首带反斜杠）认不出文件名，但哈希和算法照常识别。
+  for (const [line, algorithm] of [[`\\${sha256}  a\\nb.txt`, null], [`\\${sha256} *dir\\\\x.bin`, null], [`\\SHA256 (a\\nb.txt) = ${sha256}`, 'SHA-256']]) {
+    const parsed = parseExpected(line);
+    assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex, entry.file]), [[algorithm, sha256, '']], line);
+  }
   // Base64 摘要：SRI、带算法名的行，含无填充、URL 安全字母表及以连字符开头的 Base64url。
   for (const [name, id, node] of [['sha256', 'SHA-256', 'sha256'], ['sha384', 'SHA-384', 'sha384'], ['sha512', 'SHA-512', 'sha512'], ['sha1', 'SHA-1', 'sha1'], ['md5', 'MD5', 'md5']]) {
     for (const data of ['', 'abc', 'hashroom', '14']) {
