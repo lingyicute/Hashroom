@@ -2569,8 +2569,16 @@
 
     async function copyText(text, button, message) {
       try {
-        if (navigator.clipboard && window.isSecureContext) await navigator.clipboard.writeText(text);
-        else fallbackCopy(text);
+        let copied = false;
+        if (navigator.clipboard && window.isSecureContext) {
+          try {
+            await navigator.clipboard.writeText(text);
+            copied = true;
+          } catch (error) {
+            // 权限被拒或页面被嵌入时 Clipboard API 会失败，改用 execCommand 再试一次。
+          }
+        }
+        if (!copied) fallbackCopy(text);
         const icon = button.querySelector('.copy-icon');
         if (icon) icon.innerHTML = iconMarkup.check;
         button.classList.add('is-copied');
