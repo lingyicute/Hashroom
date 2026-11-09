@@ -2992,7 +2992,9 @@
       if (!paletteMenu.hidden && !paletteToggle.contains(event.target) && !paletteMenu.contains(event.target)) closePalette();
     });
     document.addEventListener('keydown', event => {
-      if (event.key === 'Escape') closePalette();
+      if (event.key !== 'Escape' || paletteMenu.hidden) return;
+      closePalette();
+      paletteToggle.focus();
     });
     themeToggle.addEventListener('click', () => {
       setTheme(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
