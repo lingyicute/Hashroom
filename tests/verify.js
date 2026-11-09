@@ -111,7 +111,11 @@ async function main() {
     ['cbf43926  cafe.txt', null, 8],
     [`${sha256}  sha1.txt`, null, 64],
     [`${sha256} *sha256.sum`, null, 64],
-    [`${sha256}  md5.exe`, null, 64]
+    [`${sha256}  md5.exe`, null, 64],
+    ['Hash: d41d8cd9 8f00b204 e9800998 ecf8427e', null, 32],
+    ['Checksum: d41d8cd9 8f00b204 e9800998 ecf8427e', null, 32],
+    ['d41d8cd9 8f00b204 e9800998 ecf8427e  a.txt', null, 32],
+    [`Checksum: ${spaced}`, null, 64]
   ];
   cases.forEach(([line, algorithm, length]) => {
     const parsed = parseExpected(line);
