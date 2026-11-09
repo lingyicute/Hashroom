@@ -2608,10 +2608,18 @@
 
       const hashers = ids.map(id => ({id, hasher: createHasher(id)}));
       const sliceSize = 1024 * 1024;
+      const readSlice = offset => {
+        const pending = file.slice(offset, offset + sliceSize).arrayBuffer().then(buffer => new Uint8Array(buffer));
+        pending.catch(() => {});
+        return pending;
+      };
+      // 计算当前分块的同时预读下一块，让磁盘读取和哈希重叠进行。
+      let next = file.size > 0 ? readSlice(0) : null;
       let lastYield = performance.now();
       for (let offset = 0; offset < file.size; offset += sliceSize) {
         if (token !== runToken) return null;
-        const bytes = new Uint8Array(await file.slice(offset, offset + sliceSize).arrayBuffer());
+        const bytes = await next;
+        next = offset + sliceSize < file.size ? readSlice(offset + sliceSize) : null;
         hashers.forEach(item => item.hasher.update(bytes));
         onProgress(Math.min(1, (offset + bytes.length) / Math.max(file.size, 1)));
         if (performance.now() - lastYield > 30) {
