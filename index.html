@@ -2359,7 +2359,9 @@
       algorithmCount.textContent = count ? `已选 ${count} 种` : '未选择';
     }
 
-    function setStatus(message, kind = '') {
+    // quiet 用于高频的进度更新：暂时关闭 aria-live，避免读屏软件每 100 毫秒播报一次。
+    function setStatus(message, kind = '', quiet = false) {
+      statusLine.setAttribute('aria-live', quiet ? 'off' : 'polite');
       statusLine.textContent = message;
       statusLine.className = `status-line${kind ? ` is-${kind}` : ''}`;
     }
@@ -2698,7 +2700,7 @@
           lastName = name;
           lastPaint = now;
           const percent = Math.round(progress * 100);
-          setStatus(name ? `正在计算 ${name} · ${percent}%` : `正在读取并计算 · ${percent}%`);
+          setStatus(name ? `正在计算 ${name} · ${percent}%` : `正在读取并计算 · ${percent}%`, '', true);
           showProgress(name ? `当前算法 ${name}` : '文件正在分块处理。', progress);
         });
         if (!results || token !== runToken) return;
