@@ -1320,7 +1320,7 @@
               <h2 id="compareTitle">与已有值比对</h2>
               <span class="section-note">可选</span>
             </div>
-            <button class="text-button" id="clearExpected" type="button">清空</button>
+            <button class="text-button" id="clearExpected" type="button" disabled>清空</button>
           </div>
           <label>
             <span class="visually-hidden">预期哈希</span>
@@ -2485,6 +2485,7 @@
       const scoped = entriesForFile(parsed.entries, selectedFile && selectedFile.name);
       expectedEntries = scoped.entries;
       expectedInvalid = parsed.invalid;
+      clearExpected.disabled = !expectedInput.value;
       const missing = missingCandidates();
       applySuggested.hidden = !expectedEntries.length || !missing.length;
       applySuggested.textContent = selectedAlgorithms().length ? '补选可能的算法' : '选择这些算法';
@@ -2509,9 +2510,11 @@
 
       const named = [...new Set(expectedEntries.map(entry => entry.algorithm).filter(Boolean))];
       const unnamed = expectedEntries.filter(entry => !entry.algorithm);
+      const unnamedLengths = [...new Set(unnamed.map(entry => entry.hex.length))];
       const lengthNames = [...new Set(unnamed.flatMap(entry => algorithmsForLength(entry.hex.length).map(item => item.id)))];
-      let hint = named.length ? `已识别 ${named.join('、')}` : `已识别 ${expectedEntries[0].hex.length} 位十六进制`;
-      if (!named.length && lengthNames.length) hint += `，可能是 ${lengthNames.join('、')}`;
+      let hint = named.length ? `已识别 ${named.join('、')}` : `已识别 ${unnamedLengths.join('、')} 位十六进制`;
+      if (named.length && unnamedLengths.length) hint += ` 及 ${unnamedLengths.join('、')} 位十六进制`;
+      if (lengthNames.length) hint += `，可能是 ${lengthNames.join('、')}`;
       if (parsed.partialInvalid) hint += `。有 ${parsed.invalidLines} 行无法识别，已忽略`;
       if (scoped.ignored) hint += `。已忽略 ${scoped.ignored} 条属于其他文件的校验值`;
       compareHint.textContent = `${hint}。`;
@@ -2580,7 +2583,7 @@
 
     function formatDuration(ms) {
       const seconds = ms / 1000;
-      if (seconds < 1) return `${Math.max(1, Math.round(ms))} 毫秒`;
+      if (Math.round(ms) < 1000) return `${Math.max(1, Math.round(ms))} 毫秒`;
       if (seconds < 59.5) return `${seconds.toFixed(1)} 秒`;
       const total = Math.round(seconds);
       return `${Math.floor(total / 60)} 分 ${total % 60} 秒`;
@@ -2728,8 +2731,8 @@
       isCalculating = false;
       refreshAlgorithmStyles();
       clearResults();
-      updateComputeButton();
       updateComparison();
+      updateComputeButton();
       if (!selectedFile) {
         setStatus(selectedAlgorithms().length ? '尚未选择文件' : '请至少选择一种算法。', selectedAlgorithms().length ? '' : 'error');
         renderMessage('还没有摘要', '选好文件并计算后，结果会显示在这里。');
@@ -2742,11 +2745,16 @@
 
     function setCheckedAlgorithms(ids, exclusive) {
       const wanted = new Set(ids);
+      let changed = false;
       algorithmInputs.forEach(input => {
         if (input.disabled) return;
-        input.checked = exclusive ? wanted.has(input.value) : input.checked || wanted.has(input.value);
+        const next = exclusive ? wanted.has(input.value) : input.checked || wanted.has(input.value);
+        if (input.checked !== next) {
+          input.checked = next;
+          changed = true;
+        }
       });
-      onAlgorithmsChanged();
+      if (changed) onAlgorithmsChanged();
     }
 
     function setSelectedFile(file) {
@@ -2755,8 +2763,9 @@
       selectedFile = file || null;
       fileInput.value = '';
       clearResults();
-      updateComputeButton();
       updateComparison();
+      updateComputeButton();
+      const ready = selectedAlgorithms().length > 0;
       if (!selectedFile) {
         emptyFileState.hidden = false;
         selectedFileState.hidden = true;
@@ -2764,7 +2773,7 @@
         fileName.textContent = '';
         fileMeta.textContent = '';
         dropzone.setAttribute('aria-label', DROPZONE_LABEL);
-        setStatus('尚未选择文件');
+        setStatus(ready ? '尚未选择文件' : '请至少选择一种算法。', ready ? '' : 'error');
         renderMessage('还没有摘要', '选好文件并计算后，结果会显示在这里。');
         return;
       }
@@ -2775,8 +2784,8 @@
       fileMeta.textContent = describeFile(selectedFile);
       // 按钮的 aria-label 会盖掉内部文字，读屏软件需要在标签里听到文件名。
       dropzone.setAttribute('aria-label', `已选择文件 ${selectedFile.name}，${fileMeta.textContent}。点击更换文件`);
-      setStatus(selectedAlgorithms().length ? '文件已就绪，可以开始计算。' : '请至少选择一种算法。', selectedAlgorithms().length ? '' : 'error');
-      renderMessage('文件已就绪', hasExpectedValue() ? '计算后会立即与预期值比对。' : '点击计算后，所选摘要会显示在这里。');
+      setStatus(ready ? '文件已就绪，可以开始计算。' : '请至少选择一种算法。', ready ? '' : 'error');
+      renderMessage('文件已就绪', !ready ? '至少选择一种算法后才能计算。' : hasExpectedValue() ? '计算后会立即与预期值比对。' : '点击计算后，所选摘要会显示在这里。');
     }
 
     function fallbackCopy(text) {
@@ -2944,8 +2953,9 @@
     function reportOutcome() {
       const verdict = compareBanner.querySelector('strong');
       const elapsed = lastElapsed ? `，用时 ${lastElapsed}` : '';
-      if (hasExpectedValue() && verdict && !compareBanner.hidden) {
-        setStatus(`${verdict.textContent}${elapsed}`, compareBanner.classList.contains('is-match') ? 'match' : compareBanner.classList.contains('is-mismatch') ? 'error' : '');
+      if ((hasExpectedValue() || expectedInvalid) && verdict && !compareBanner.hidden) {
+        const isError = compareBanner.classList.contains('is-mismatch') || compareBanner.classList.contains('is-invalid');
+        setStatus(`${verdict.textContent}${elapsed}`, compareBanner.classList.contains('is-match') ? 'match' : isError ? 'error' : '');
       } else {
         setStatus(`已完成 ${currentResults.length} 种摘要计算${elapsed}。`, 'match');
       }
