@@ -198,6 +198,43 @@
     *::before,
     *::after {
       box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      border: 0 solid;
+    }
+
+    h1,
+    h2,
+    h3 {
+      font-size: inherit;
+      font-weight: inherit;
+    }
+
+    a {
+      color: inherit;
+      text-decoration: inherit;
+    }
+
+    svg {
+      display: block;
+      vertical-align: middle;
+    }
+
+    button,
+    input,
+    textarea {
+      letter-spacing: inherit;
+      border-radius: 0;
+      background-color: transparent;
+    }
+
+    textarea {
+      resize: vertical;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 1em;
     }
 
     [hidden] {
@@ -380,7 +417,7 @@
     }
 
     h1 {
-      margin: -5px;
+      margin: -5px 0;
       font-size: clamp(36px, 5vw, 47px);
       font-weight: 620;
       letter-spacing: -.055em;
