@@ -1456,6 +1456,7 @@
     let expectedInvalid = false;
     let isCalculating = false;
     let runToken = 0;
+    let lastElapsed = '';
     const copyTimers = new WeakMap();
 
     function rotr32(value, bits) {
@@ -2566,6 +2567,14 @@
       statusLine.className = `status-line${kind ? ` is-${kind}` : ''}`;
     }
 
+    function formatDuration(ms) {
+      const seconds = ms / 1000;
+      if (seconds < 1) return `${Math.max(1, Math.round(ms))} 毫秒`;
+      if (seconds < 59.5) return `${seconds.toFixed(1)} 秒`;
+      const total = Math.round(seconds);
+      return `${Math.floor(total / 60)} 分 ${total % 60} 秒`;
+    }
+
     function formatBytes(bytes) {
       if (bytes === 0) return '0 B';
       const units = ['B', 'KB', 'MB', 'GB', 'TB'];
@@ -2699,6 +2708,7 @@
 
     function clearResults() {
       currentResults = [];
+      lastElapsed = '';
       copyAllButton.disabled = true;
     }
 
@@ -2916,10 +2926,11 @@
     // 结果已经显示时，状态栏跟随最新的比对结论，不留下过时的信息。
     function reportOutcome() {
       const verdict = compareBanner.querySelector('strong');
+      const elapsed = lastElapsed ? `，用时 ${lastElapsed}` : '';
       if (hasExpectedValue() && verdict && !compareBanner.hidden) {
-        setStatus(verdict.textContent, compareBanner.classList.contains('is-match') ? 'match' : compareBanner.classList.contains('is-mismatch') ? 'error' : '');
+        setStatus(`${verdict.textContent}${elapsed}`, compareBanner.classList.contains('is-match') ? 'match' : compareBanner.classList.contains('is-mismatch') ? 'error' : '');
       } else {
-        setStatus(`已完成 ${currentResults.length} 种摘要计算。`, 'match');
+        setStatus(`已完成 ${currentResults.length} 种摘要计算${elapsed}。`, 'match');
       }
     }
 
@@ -2949,6 +2960,7 @@
       updateComputeButton();
       setStatus('正在读取文件并计算摘要…');
       renderMessage('正在计算摘要', '大文件可能需要一点时间，请保持页面打开。', 'loading', 0.04);
+      const started = performance.now();
       try {
         let lastPaint = -Infinity;
         let lastName;
@@ -2964,6 +2976,7 @@
         });
         if (!results || token !== runToken) return;
         renderResults(results);
+        lastElapsed = formatDuration(performance.now() - started);
         updateComparison();
         reportOutcome();
         if (!matchMedia('(prefers-reduced-motion: reduce)').matches) {
