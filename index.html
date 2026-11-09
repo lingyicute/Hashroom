@@ -1858,31 +1858,22 @@
     }
 
     function keccakF(state) {
+      const c = KECCAK_C;
+      const d = KECCAK_D;
+      const row = KECCAK_ROW;
       for (let round = 0; round < 24; round += 1) {
-        const c = KECCAK_C;
-        for (let x = 0; x < 5; x += 1) {
-          let lo = state[x * 2];
-          let hi = state[x * 2 + 1];
-          for (let y = 1; y < 5; y += 1) {
-            lo ^= state[(x + 5 * y) * 2];
-            hi ^= state[(x + 5 * y) * 2 + 1];
-          }
-          c[x * 2] = lo >>> 0;
-          c[x * 2 + 1] = hi >>> 0;
+        for (let x = 0; x < 10; x += 2) {
+          c[x] = state[x] ^ state[x + 10] ^ state[x + 20] ^ state[x + 30] ^ state[x + 40];
+          c[x + 1] = state[x + 1] ^ state[x + 11] ^ state[x + 21] ^ state[x + 31] ^ state[x + 41];
         }
-        const d = KECCAK_D;
-        for (let x = 0; x < 5; x += 1) {
-          const x1 = ((x + 1) % 5) * 2;
-          const x4 = ((x + 4) % 5) * 2;
-          const rlo = ((c[x1] << 1) | (c[x1 + 1] >>> 31)) >>> 0;
-          const rhi = ((c[x1 + 1] << 1) | (c[x1] >>> 31)) >>> 0;
-          d[x * 2] = (c[x4] ^ rlo) >>> 0;
-          d[x * 2 + 1] = (c[x4 + 1] ^ rhi) >>> 0;
+        for (let x = 0; x < 10; x += 2) {
+          const next = x === 8 ? 0 : x + 2;
+          const prev = x === 0 ? 8 : x - 2;
+          d[x] = c[prev] ^ ((c[next] << 1) | (c[next + 1] >>> 31));
+          d[x + 1] = c[prev + 1] ^ ((c[next + 1] << 1) | (c[next] >>> 31));
         }
-        for (let i = 0; i < 25; i += 1) {
-          const x = (i % 5) * 2;
-          state[i * 2] = (state[i * 2] ^ d[x]) >>> 0;
-          state[i * 2 + 1] = (state[i * 2 + 1] ^ d[x + 1]) >>> 0;
+        for (let i = 0; i < 50; i += 10) {
+          for (let x = 0; x < 10; x += 1) state[i + x] ^= d[x];
         }
         let lastLo = state[2];
         let lastHi = state[3];
@@ -1896,23 +1887,17 @@
           lastLo = curLo;
           lastHi = curHi;
         }
-        for (let y = 0; y < 5; y += 1) {
-          const base = y * 5;
-          const row = KECCAK_ROW;
-          for (let x = 0; x < 5; x += 1) {
-            row[x * 2] = state[(base + x) * 2];
-            row[x * 2 + 1] = state[(base + x) * 2 + 1];
-          }
-          for (let x = 0; x < 5; x += 1) {
-            const one = ((x + 1) % 5) * 2;
-            const two = ((x + 2) % 5) * 2;
-            const at = (base + x) * 2;
-            state[at] = (row[x * 2] ^ ((~row[one]) & row[two])) >>> 0;
-            state[at + 1] = (row[x * 2 + 1] ^ ((~row[one + 1]) & row[two + 1])) >>> 0;
+        for (let base = 0; base < 50; base += 10) {
+          for (let x = 0; x < 10; x += 1) row[x] = state[base + x];
+          for (let x = 0; x < 10; x += 2) {
+            const one = x === 8 ? 0 : x + 2;
+            const two = one === 8 ? 0 : one + 2;
+            state[base + x] = row[x] ^ (~row[one] & row[two]);
+            state[base + x + 1] = row[x + 1] ^ (~row[one + 1] & row[two + 1]);
           }
         }
-        state[0] = (state[0] ^ KECCAK_RC[round][0]) >>> 0;
-        state[1] = (state[1] ^ KECCAK_RC[round][1]) >>> 0;
+        state[0] ^= KECCAK_RC[round][0];
+        state[1] ^= KECCAK_RC[round][1];
       }
     }
 
@@ -1920,53 +1905,31 @@
       constructor(rate, outLen) {
         this.rate = rate;
         this.outLen = outLen;
-        this.state = new Uint8Array(200);
         this.lanes = new Uint32Array(50);
         this.offset = 0;
       }
 
-      update(data) {
-        let index = 0;
-        while (index < data.length) {
-          const take = Math.min(this.rate - this.offset, data.length - index);
-          for (let i = 0; i < take; i += 1) this.state[this.offset + i] ^= data[index + i];
-          this.offset += take;
-          index += take;
-          if (this.offset === this.rate) {
-            this.permute();
-            this.offset = 0;
-          }
+      absorbByte(value) {
+        this.lanes[this.offset >> 2] ^= value << ((this.offset & 3) * 8);
+        this.offset += 1;
+        if (this.offset === this.rate) {
+          keccakF(this.lanes);
+          this.offset = 0;
         }
+      }
+
+      update(data) {
+        for (let i = 0; i < data.length; i += 1) this.absorbByte(data[i]);
         return this;
       }
 
-      permute() {
-        for (let i = 0; i < 25; i += 1) {
-          const at = i * 8;
-          this.lanes[i * 2] = (this.state[at] | (this.state[at + 1] << 8) | (this.state[at + 2] << 16) | (this.state[at + 3] << 24)) >>> 0;
-          this.lanes[i * 2 + 1] = (this.state[at + 4] | (this.state[at + 5] << 8) | (this.state[at + 6] << 16) | (this.state[at + 7] << 24)) >>> 0;
-        }
-        keccakF(this.lanes);
-        for (let i = 0; i < 25; i += 1) {
-          const at = i * 8;
-          const lo = this.lanes[i * 2];
-          const hi = this.lanes[i * 2 + 1];
-          this.state[at] = lo;
-          this.state[at + 1] = lo >>> 8;
-          this.state[at + 2] = lo >>> 16;
-          this.state[at + 3] = lo >>> 24;
-          this.state[at + 4] = hi;
-          this.state[at + 5] = hi >>> 8;
-          this.state[at + 6] = hi >>> 16;
-          this.state[at + 7] = hi >>> 24;
-        }
-      }
-
       digest() {
-        this.state[this.offset] ^= 0x06;
-        this.state[this.rate - 1] ^= 0x80;
-        this.permute();
-        return bytesToHex(this.state.subarray(0, this.outLen));
+        this.lanes[this.offset >> 2] ^= 0x06 << ((this.offset & 3) * 8);
+        this.lanes[(this.rate - 1) >> 2] ^= 0x80 << (((this.rate - 1) & 3) * 8);
+        keccakF(this.lanes);
+        const out = new Uint8Array(this.outLen);
+        for (let i = 0; i < this.outLen; i += 1) out[i] = this.lanes[i >> 2] >>> ((i & 3) * 8);
+        return bytesToHex(out);
       }
     }
 
