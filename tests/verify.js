@@ -256,6 +256,12 @@ async function main() {
   const distinfo = parseExpected(`BLAKE2s (file.iso) = ${sha256}\nSHA512 (file.iso) = ${sha256}${sha256}\nSize (file.iso) = 1234 bytes`);
   assert.deepStrictEqual(distinfo.entries.map(entry => entry.algorithm), ['SHA-512']);
   assert.deepStrictEqual(distinfo.unsupported, ['BLAKE2s']);
+  // 混着可用算法的清单不是整体无效，不支持的算法只能在提示里说明，而不是只说“无法识别”。
+  assert.strictEqual(distinfo.invalid, false);
+  assert.strictEqual(distinfo.partialInvalid, true);
+  // 不支持算法的那一行单独计数，提示里不会再把它算进“无法识别”的行数（这里只剩 Size 一行）。
+  assert.strictEqual(distinfo.invalidLines, 2);
+  assert.strictEqual(distinfo.unsupportedLines, 1);
   // 文件名里的同类名字不算标记，带着可用算法名的行也照常识别。
   assert.strictEqual(parseExpected(`${sha256}  blake3.iso`).entries.length, 1);
   assert.strictEqual(parseExpected(`blake3-notes.txt: ${sha256}`).entries.length, 1);
