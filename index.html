@@ -2537,7 +2537,8 @@
       applySuggested.hidden = !expectedEntries.length || !missing.length;
       applySuggested.textContent = selectedAlgorithms().length ? '补选可能的算法' : '选择这些算法';
 
-      if (!expectedInput.value.trim()) {
+      // 只含零宽字符之类的输入解析不出任何一行，同样按没有填写处理。
+      if (!parsed.entries.length && !parsed.invalid) {
         compareBanner.hidden = true;
         compareHint.textContent = '计算完成后会自动比对，忽略大小写和分隔符。';
         return;
