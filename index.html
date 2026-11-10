@@ -3272,6 +3272,8 @@
       }
       refreshAlgorithmStyles();
       updateComputeButton();
+      // 停用后重新算一遍可补选的算法，别再建议已经停用的那几个。
+      updateComparison();
       const names = ids.join('、');
       setStatus(`算法自检未通过：${names}，已暂停使用。`, 'error');
       renderMessage('算法自检未通过', `${names} 的计算结果与标准测试向量不一致，已暂停这些算法，其他算法不受影响。`, 'error');
