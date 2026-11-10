@@ -2488,7 +2488,8 @@
       const ids = new Set();
       expectedEntries.forEach(entry => {
         if (entry.algorithm) ids.add(entry.algorithm);
-        else algorithmsForLength(entry.hex.length).forEach(item => ids.add(item.id));
+        // 未标注算法的预期值一旦被某个结果命中，就不必再建议同长度的其他算法。
+        else if (!currentResults.some(result => hexEqual(result.hex, entry.hex))) algorithmsForLength(entry.hex.length).forEach(item => ids.add(item.id));
       });
       return [...ids];
     }
