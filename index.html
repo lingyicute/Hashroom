@@ -2308,8 +2308,8 @@
 
     // 在所有“连续成组”的片段里挑哈希：标签（如 Hash:）或文件名里零散的十六进制字符，
     // 既不会被拼进哈希，也不会让分组书写的哈希被误认成其中某一组。
-    function extractHex(line, expectedLength) {
-      const {tokens, sep, adjacent, grouped} = hexTokens(line);
+    function extractHex(line, expectedLength, parsed = hexTokens(line)) {
+      const {tokens, sep, adjacent, grouped} = parsed;
       let best = '';
       let bestExact = false;
       let bestScore = -1;
@@ -2335,8 +2335,8 @@
       return best;
     }
 
-    function longestHexRun(line) {
-      const {tokens, sep, adjacent} = hexTokens(line);
+    function longestHexRun(line, parsed = hexTokens(line)) {
+      const {tokens, sep, adjacent} = parsed;
       let max = 0;
       for (let start = 0; start < tokens.length; start += 1) {
         let len = 0;
@@ -2474,11 +2474,15 @@
           if (!unsupported.some(name => name.toLowerCase() === foreign[0].toLowerCase())) unsupported.push(foreign[0]);
           return;
         }
-        if (!algorithm && !HASH_LENGTHS.has(hex.length)) hex = extractHex(content, 0);
+        let parsedHex;
+        if (!algorithm && !HASH_LENGTHS.has(hex.length)) {
+          parsedHex = hexTokens(content);
+          hex = extractHex(content, 0, parsedHex);
+        }
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
           invalidLines += 1;
           // 记下最长的一段十六进制，复制不完整的哈希可以据此给出提示。
-          strayLength = Math.max(strayLength, longestHexRun(content));
+          strayLength = Math.max(strayLength, longestHexRun(content, parsedHex));
           return;
         }
         entries.push({algorithm, hex, raw: line, file});
@@ -3040,6 +3044,8 @@
         const bytes = await next;
         // 等待读取期间可能已经取消：不再预读下一块，也不再白白计算这一块。
         if (token !== runToken) return null;
+        // 读到的比应有的短（含空分块）时，offset 仍会照常前进，等于悄悄跳过数据、算出错误摘要，所以直接报错。
+        if (bytes.length < Math.min(sliceSize, file.size - offset)) throw new Error('Unexpected end of file');
         next = offset + sliceSize < file.size ? readSlice(offset + sliceSize) : null;
         // 同时选了很多算法时，一块数据要算很久，每个算法之后都检查一次是否该让出线程。
         for (const item of hashers) {
