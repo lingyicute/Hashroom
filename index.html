@@ -2652,7 +2652,12 @@
       if (mismatched.length) {
         const first = expectedEntries.find(entry => unmatchedTargets(entry).length);
         const target = unmatchedTargets(first).find(result => result.hex.length === first.hex.length);
-        const where = target ? `，与 ${target.algorithm} 从第 ${firstDifference(first.hex, target.hex)} 位开始不同` : '';
+        // 横幅开头已经点名了这一条没匹配的算法（预期值写明了算法，或只有一个候选算法）时，
+        // 不必再重复“与 SHA-256”；只有开头列的是“A / B”这类多个候选时，才需要说明比的是哪一个。
+        const firstMissed = target ? unmatchedTargets(first) : [];
+        const covered = target && (first.algorithm === target.algorithm || (!first.algorithm && firstMissed.length === 1));
+        const compared = target && !covered ? `与 ${target.algorithm} ` : '';
+        const where = target ? `，${compared}从第 ${firstDifference(first.hex, target.hex)} 位开始不同` : '';
         renderBanner('mismatch', '校验值不一致', `${mismatched.join('、')} 没有匹配${where}。`);
         return;
       }
@@ -3354,8 +3359,8 @@
           failed.add(item.id);
         }
       });
+      // 自检通过时不覆盖状态栏：页面初始的“尚未选择文件”才是此刻更该留在那里的提示。
       if (failed.size) disableAlgorithms([...failed]);
-      else setStatus('算法自检通过', 'match');
     }
 
     renderAlgorithms();
@@ -3399,7 +3404,11 @@
     }
 
     function hasFiles(event) {
-      return Boolean(event.dataTransfer && Array.from(event.dataTransfer.types || []).includes('Files'));
+      const transfer = event.dataTransfer;
+      if (!transfer) return false;
+      // 个别浏览器（以及部分 WebView）在 drop 时 types 可能不含 'Files'，但 files 里已经有文件；
+      // 只认 types 会让这次拖放不被接管，浏览器直接打开文件、页面状态全部丢失。
+      return Boolean((transfer.files && transfer.files.length) || Array.from(transfer.types || []).includes('Files'));
     }
     window.addEventListener('dragover', event => {
       if (hasFiles(event)) event.preventDefault();
