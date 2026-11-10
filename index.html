@@ -2877,7 +2877,12 @@
       textarea.select();
       // iOS Safari 的 select() 选不中只读文本框里的内容，需要再显式设置一次选区。
       textarea.setSelectionRange(0, text.length);
-      const copied = document.execCommand('copy');
+      let copied = false;
+      try {
+        copied = document.execCommand('copy');
+      } catch (error) {
+        // 个别浏览器不允许复制时会直接抛错：同样按失败处理，临时文本框和焦点照常还原。
+      }
       textarea.remove();
       if (active && typeof active.focus === 'function') active.focus({preventScroll: true});
       if (!copied) throw new Error('Clipboard copy failed');
