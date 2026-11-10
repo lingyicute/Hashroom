@@ -2343,8 +2343,8 @@
 
     // 紧跟在字母、数字、点或斜杠之后的名字多半是文件名的一部分（如 app.md5），
     // 后面直接接扩展名、下划线、斜杠或其它字母数字的名字同理（如 sha256.txt、sha256sum.txt），都不当作算法标记。
-    function findAlgorithmNames(line) {
-      return [...line.matchAll(NAME_PATTERN)].filter(found => {
+    function findAlgorithmNames(line, pattern = NAME_PATTERN) {
+      return [...line.matchAll(pattern)].filter(found => {
         if (found.index > 0) {
           const before = line[found.index - 1];
           if (/[a-z0-9._/\\]/i.test(before)) return false;
@@ -2409,10 +2409,15 @@
       return {entries: kept, ignored: entries.length - kept.length};
     }
 
+    // Hashroom 算不了、却常见于校验清单的算法名（pkgsrc 的 distinfo、openssl dgst、cksum -a 等的输出）。
+    // 标着这些名字的摘要不能按长度去猜：BLAKE2s、SM3 与 SHA-256 等长，硬比只会误报“不一致”。
+    const UNSUPPORTED_PATTERN = /blake[-_]?[23][a-z]*(?:[-_]?[0-9]+)?|sm-?3|shake-?(?:128|256)|md-?[24]|ripemd-?(?:128|256|320)|whirlpool|streebog(?:-?[0-9]+)?|skein(?:-?[0-9]+)?|xxh(?:ash)?(?:-?[0-9]+)?|adler-?32|crc-?32c/gi;
+
     function parseExpected(raw) {
       const lines = normalizeText(raw).split(/\r\n?|[\n\u2028\u2029]/).map(line => line.trim()).filter(Boolean);
       if (!lines.length) return {entries: [], invalid: false};
       const entries = [];
+      const unsupported = [];
       let invalidLines = 0;
       let strayLength = 0;
       lines.forEach(line => {
@@ -2443,6 +2448,13 @@
         // 名字对应的长度与读到的哈希不符（如 sha1sum 输出里的文件名 sha256-notes.txt，或标签写错），
         // 这个名字就不是算法标记，改按长度判断，免得给哈希贴上错误的算法。
         if (algorithm && hex.length !== ALGORITHMS.find(item => item.id === algorithm).bits / 4) algorithm = null;
+        // 没有可用的算法标记、却标着不支持的算法：这一行不参与比对。名字后面紧跟连字符的多半是文件名（blake3-notes.txt）。
+        const foreign = algorithm ? null : findAlgorithmNames(content, UNSUPPORTED_PATTERN).find(found => content[found.index + found[0].length] !== '-');
+        if (foreign) {
+          invalidLines += 1;
+          if (!unsupported.includes(foreign[0])) unsupported.push(foreign[0]);
+          return;
+        }
         if (!algorithm && !HASH_LENGTHS.has(hex.length)) hex = extractHex(content, 0);
         if (!hex || !HASH_LENGTHS.has(hex.length)) {
           invalidLines += 1;
@@ -2452,7 +2464,7 @@
         }
         entries.push({algorithm, hex, raw: line, file});
       });
-      return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines, strayLength};
+      return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines, strayLength, unsupported};
     }
 
     function entryTargets(entry, algorithm, hex) {
@@ -2531,6 +2543,12 @@
         return;
       }
       if (parsed.invalid) {
+        if (parsed.unsupported.length) {
+          const names = parsed.unsupported.join('、');
+          compareHint.textContent = `预期值标注的算法是 ${names}。`;
+          renderBanner('invalid', '不支持的算法', `这里无法计算 ${names}，请换用上面所列算法的校验值。`);
+          return;
+        }
         // 长度只差几位多半是复制不完整，直接告诉用户读到了多少位。
         if (parsed.strayLength > 8) {
           const lengths = [...HASH_LENGTHS].sort((a, b) => a - b).join('、');

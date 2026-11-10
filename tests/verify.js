@@ -209,6 +209,19 @@ async function main() {
   assert.strictEqual(parseExpected('garbage').invalid, true);
   assert.strictEqual(parseExpected('deafbeefs').invalid, true);
   assert.strictEqual(parseExpected('deadbeef.bin').invalid, true);
+  // 标着不支持的算法（BLAKE2、SM3 等）的摘要不按长度去猜，免得与等长的 SHA-256、MD5、CRC32 硬比。
+  for (const line of [`BLAKE2s (file.iso) = ${sha256}`, `SM3(file.iso)= ${sha256}`, `BLAKE2b-512: ${sha256}${sha256}`, 'MD4 (file.iso) = d41d8cd98f00b204e9800998ecf8427e', 'CRC32C: cbf43926']) {
+    const foreign = parseExpected(line);
+    assert.strictEqual(foreign.invalid, true, line);
+    assert.strictEqual(foreign.unsupported.length, 1, line);
+  }
+  const distinfo = parseExpected(`BLAKE2s (file.iso) = ${sha256}\nSHA512 (file.iso) = ${sha256}${sha256}\nSize (file.iso) = 1234 bytes`);
+  assert.deepStrictEqual(distinfo.entries.map(entry => entry.algorithm), ['SHA-512']);
+  assert.deepStrictEqual(distinfo.unsupported, ['BLAKE2s']);
+  // 文件名里的同类名字不算标记，带着可用算法名的行也照常识别。
+  assert.strictEqual(parseExpected(`${sha256}  blake3.iso`).entries.length, 1);
+  assert.strictEqual(parseExpected(`blake3-notes.txt: ${sha256}`).entries.length, 1);
+  assert.strictEqual(parseExpected(`BLAKE2b / SHA-512: ${sha256}${sha256}`).entries[0].algorithm, 'SHA-512');
   for (const sample of [`SHA-256: ${sha256.slice(1)}`, `SHA-256: ${spaced.slice(0, -1)}`, `SHA-256: ${spaced.slice(1)}`]) {
     const truncated = parseExpected(sample);
     assert.strictEqual(truncated.invalid, true, sample);
