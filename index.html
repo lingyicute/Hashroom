@@ -2450,6 +2450,7 @@
       const entries = [];
       const unsupported = [];
       let invalidLines = 0;
+      let unsupportedLines = 0;
       let strayLength = 0;
       lines.forEach(line => {
         if (line.length > MAX_LINE_LENGTH) {
@@ -2484,6 +2485,7 @@
         const foreign = findAlgorithmNames(content, UNSUPPORTED_PATTERN).find(found => content[found.index + found[0].length] !== '-' && (!algorithm || /^hmac/i.test(found[0])));
         if (foreign) {
           invalidLines += 1;
+          unsupportedLines += 1;
           if (!unsupported.some(name => name.toLowerCase() === foreign[0].toLowerCase())) unsupported.push(foreign[0]);
           return;
         }
@@ -2500,7 +2502,7 @@
         }
         entries.push({algorithm, hex, raw: line, file});
       });
-      return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines, strayLength, unsupported};
+      return {entries, invalid: invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0, invalidLines, unsupportedLines, strayLength, unsupported};
     }
 
     function entryTargets(entry, algorithm, hex) {
@@ -2606,7 +2608,11 @@
       let hint = named.length ? `已识别 ${named.join('、')}` : `已识别 ${unnamedLengths.join('、')} 位十六进制`;
       if (named.length && unnamedLengths.length) hint += ` 及 ${unnamedLengths.join('、')} 位十六进制`;
       if (lengthNames.length) hint += `，可能是 ${lengthNames.join('、')}`;
-      if (parsed.partialInvalid) hint += `。有 ${parsed.invalidLines} 行无法识别，已忽略`;
+      // 混着支持与不支持算法的清单（如 pkgsrc 的 distinfo）也要说明哪些算法没算。
+      if (parsed.unsupported.length) hint += `。${parsed.unsupported.join('、')} 无法计算，已忽略`;
+      // 不支持算法的行已经在上面说明过，这里只数其余无法识别的行，免得同一行被说两遍。
+      const otherInvalid = parsed.invalidLines - parsed.unsupportedLines;
+      if (parsed.partialInvalid && otherInvalid > 0) hint += `。${parsed.unsupported.length ? '另有' : '有'} ${otherInvalid} 行无法识别，已忽略`;
       if (scoped.ignored) hint += `。已忽略 ${scoped.ignored} 条属于其他文件的校验值`;
       compareHint.textContent = `${hint}。`;
 
