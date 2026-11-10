@@ -1491,10 +1491,6 @@
     let lastElapsed = '';
     const copyTimers = new WeakMap();
 
-    function rotr32(value, bits) {
-      return ((value >>> bits) | (value << (32 - bits))) >>> 0;
-    }
-
     function rotl32(value, bits) {
       return ((value << bits) | (value >>> (32 - bits))) >>> 0;
     }
