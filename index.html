@@ -688,14 +688,17 @@
       outline-offset: 2px;
     }
 
+    .algorithm-box {
+      position: relative;
+      flex: 0 0 auto;
+      display: grid;
+    }
+
     .algorithm-option input {
       width: 17px;
       height: 17px;
-      flex: 0 0 auto;
       -webkit-appearance: none;
       appearance: none;
-      display: grid;
-      place-items: center;
       margin: 0;
       border: 1.5px solid var(--outline);
       border-radius: 5px;
@@ -703,7 +706,24 @@
       cursor: pointer;
     }
 
-    .algorithm-option input::after {
+    .algorithm-option input:checked {
+      border-color: var(--primary);
+      background: var(--primary);
+    }
+
+    /* 各浏览器对 input 上的伪元素支持不一致（Firefox 就不可靠），勾号画在紧随其后的真实元素上。 */
+    .algorithm-mark {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: grid;
+      place-items: center;
+      pointer-events: none;
+    }
+
+    .algorithm-mark::after {
       width: 8px;
       height: 5px;
       content: "";
@@ -713,12 +733,7 @@
       transform: translateY(-1px) rotate(-45deg);
     }
 
-    .algorithm-option input:checked {
-      border-color: var(--primary);
-      background: var(--primary);
-    }
-
-    .algorithm-option input:checked::after {
+    .algorithm-option input:checked+.algorithm-mark::after {
       opacity: 1;
     }
 
@@ -3149,15 +3164,22 @@
           const option = document.createElement('label');
           option.className = `algorithm-option${item.checked ? ' is-selected' : ''}`;
           if (item.title) option.title = item.title;
+          const box = document.createElement('span');
+          box.className = 'algorithm-box';
           const input = document.createElement('input');
           input.type = 'checkbox';
           input.name = 'algorithm';
           input.value = item.id;
           input.checked = Boolean(item.checked);
+          // 勾号画在这个 span 上：Firefox 等浏览器对 input 上的伪元素支持不一致。
+          const mark = document.createElement('span');
+          mark.className = 'algorithm-mark';
+          mark.setAttribute('aria-hidden', 'true');
           const name = document.createElement('span');
           name.className = 'algorithm-name';
           name.textContent = item.id;
-          option.append(input, name);
+          box.append(input, mark);
+          option.append(box, name);
           list.append(option);
         });
         wrap.append(label, list);
