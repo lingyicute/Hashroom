@@ -2426,9 +2426,10 @@
       return {entries: kept, ignored: entries.length - kept.length};
     }
 
-    // Hashroom 算不了、却常见于校验清单的算法名（pkgsrc 的 distinfo、openssl dgst、cksum -a 等的输出）。
-    // 标着这些名字的摘要不能按长度去猜：BLAKE2s、SM3 与 SHA-256 等长，硬比只会误报“不一致”。
-    const UNSUPPORTED_PATTERN = /blake[-_]?[23][a-z]*(?:[-_]?[0-9]+)?|sm-?3|shake-?(?:128|256)|md-?[24]|ripemd-?(?:128|256|320)|whirlpool|streebog(?:-?[0-9]+)?|skein(?:-?[0-9]+)?|xxh(?:ash)?(?:-?[0-9]+)?|adler-?32|crc-?32c/gi;
+    // Hashroom 算不了、却常见于校验清单的算法名（pkgsrc 的 distinfo、openssl dgst、cksum -a 等的输出，
+    // 以及连命令名一起粘贴的 b2sum/b3sum、xxhsum）。
+    // 标着这些名字的摘要不能按长度去猜：BLAKE2s、BLAKE3、SM3、Keccak-256 等与 SHA-256 等长，硬比只会误报“不一致”。
+    const UNSUPPORTED_PATTERN = /blake[-_]?[23][a-z]*(?:[-_]?[0-9]+)?|b[23]sum|sm-?3|shake-?(?:128|256)|keccak[-_]?(?:224|256|384|512)|hmac(?:[-_]?(?:sha[-_]?(?:[23][-_]?)?(?:512(?:[/_t-]?(?:224|256))?|224|256|384|1)|md[-_]?[245]|ripemd[-_]?160|sm-?3))?|md-?[24]|ripemd-?(?:128|256|320)|whirlpool|streebog(?:-?[0-9]+)?|skein(?:-?[0-9]+)?|xxh(?:ash)?(?:[-_]?[0-9]+)*(?:bits?)?|adler-?32|crc-?32c/gi;
 
     function parseExpected(raw) {
       const lines = normalizeText(raw).split(/\r\n?|[\n\u2028\u2029]/).map(line => line.trim()).filter(Boolean);
@@ -2466,10 +2467,11 @@
         // 这个名字就不是算法标记，改按长度判断，免得给哈希贴上错误的算法。
         if (algorithm && hex.length !== ALGORITHMS.find(item => item.id === algorithm).bits / 4) algorithm = null;
         // 没有可用的算法标记、却标着不支持的算法：这一行不参与比对。名字后面紧跟连字符的多半是文件名（blake3-notes.txt）。
-        const foreign = algorithm ? null : findAlgorithmNames(content, UNSUPPORTED_PATTERN).find(found => content[found.index + found[0].length] !== '-');
+        // HMAC 例外：“HMAC SHA256: …”“SHA256 HMAC: …”里的 SHA256 会被认成算法标记，但带密钥的摘要与文件的 SHA-256 不可能一致。
+        const foreign = findAlgorithmNames(content, UNSUPPORTED_PATTERN).find(found => content[found.index + found[0].length] !== '-' && (!algorithm || /^hmac/i.test(found[0])));
         if (foreign) {
           invalidLines += 1;
-          if (!unsupported.includes(foreign[0])) unsupported.push(foreign[0]);
+          if (!unsupported.some(name => name.toLowerCase() === foreign[0].toLowerCase())) unsupported.push(foreign[0]);
           return;
         }
         if (!algorithm && !HASH_LENGTHS.has(hex.length)) hex = extractHex(content, 0);
