@@ -60,6 +60,25 @@ function checkBitLength() {
   console.log('ok    bit length');
 }
 
+// 用时格式：999.6 毫秒进位成 1.0 秒；按毫秒先取整再换算秒会二次舍入（1049.6 毫秒会变成 1.1 秒），所以直接用原值。
+function checkDurationFormat() {
+  const formatDuration = new Function(`${cut('function formatDuration', 'function formatBytes')}\nreturn formatDuration;`)();
+  for (const [ms, want] of [
+    [0, '1 毫秒'],
+    [999.4, '999 毫秒'],
+    [999.6, '1.0 秒'],
+    [1000, '1.0 秒'],
+    [1049.6, '1.0 秒'],
+    [1234, '1.2 秒'],
+    [59400, '59.4 秒'],
+    [59500, '1 分 0 秒'],
+    [119999, '2 分 0 秒']
+  ]) {
+    assert.strictEqual(formatDuration(ms), want, `用时格式错误（${ms} 毫秒）`);
+  }
+  console.log('ok    duration format');
+}
+
 // 启动自检用的标准向量本身必须正确，否则浏览器里会误停用算法。
 function checkSelfTestVectors() {
   const vectors = new Function(`${cut('const MSG56 =', 'const failed = new Set()')}\nreturn vectors;`)();
@@ -74,6 +93,7 @@ function checkSelfTestVectors() {
 
 async function main() {
   checkBitLength();
+  checkDurationFormat();
   checkSelfTestVectors();
   const hasCrc = typeof require('zlib').crc32 === 'function';
   const sizes = [];
