@@ -167,7 +167,12 @@ async function main() {
     ['d41d8cd9 8f00b204 e9800998 ecf8427e  deadbeef.bin', null, 32],
     ['d41d8cd98f00b204e9800998ecf8427e  da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 32],
     ['CRC32 (deadbeef) = cbf43926', 'CRC32', 8],
-    ['SHA-256: da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 40]
+    ['SHA-256: da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 40],
+    [`sha3_256: ${sha256}`, 'SHA3-256', 64],
+    [`sha512_256 = ${sha256}`, 'SHA-512/256', 64],
+    [`SHA_256: ${sha256}`, 'SHA-256', 64],
+    [`SHA512t256 (file.iso) = ${sha256}`, 'SHA-512/256', 64],
+    [`${sha256}  sha3_256.txt`, null, 64]
   ];
   cases.forEach(([line, algorithm, length]) => {
     const parsed = parseExpected(line);

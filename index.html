@@ -2238,7 +2238,8 @@
     }
 
     function canonicalAlgorithm(token) {
-      const key = token.toLowerCase().replace(/[^a-z0-9]/g, '');
+      // FreeBSD 把 SHA-512/256 写作 SHA512t256，去掉中间的 t 再查表。
+      const key = token.toLowerCase().replace(/[^a-z0-9]/g, '').replace(/^(sha2?512)t/, '$1');
       return {
         md5: 'MD5',
         sha1: 'SHA-1',
@@ -2343,7 +2344,8 @@
     const MAX_LINE_LENGTH = 2048;
     const MAX_NAMES_PER_LINE = 8;
 
-    const NAME_PATTERN = /sha-?(?:2-?)?512[/-]?(?:224|256)|sha-?[23]-?(?:224|256|384|512)|sha-?(?:224|256|384|512|1)|ripemd-?160|rmd-?160|crc-?32|md-?5/gi;
+    // 连字符也可以写成下划线（Python hashlib 的 sha3_256、sha512_256），FreeBSD 则把 SHA-512/256 写作 SHA512t256。
+    const NAME_PATTERN = /sha[-_]?(?:2[-_]?)?512[/_t-]?(?:224|256)|sha[-_]?[23][-_]?(?:224|256|384|512)|sha[-_]?(?:224|256|384|512|1)|ripemd[-_]?160|rmd[-_]?160|crc[-_]?32|md[-_]?5/gi;
 
     // 紧跟在字母、数字、点或斜杠之后的名字多半是文件名的一部分（如 app.md5），
     // 后面直接接扩展名、下划线、斜杠或其它字母数字的名字同理（如 sha256.txt、sha256sum.txt），都不当作算法标记。
