@@ -2555,7 +2555,7 @@
       compareHint.textContent = `${hint}。`;
 
       if (!currentResults.length) {
-        renderBanner('info', '等待计算结果', missing.length ? `还需要计算 ${describeCandidates(missing)}。` : '点击计算后会自动比对。');
+        renderBanner('info', '等待计算结果', missing.length ? `还需要计算 ${describeCandidates(missing)}。` : '计算完成后会自动比对。');
         return;
       }
 
@@ -3046,6 +3046,8 @@
       const file = selectedFile;
       const token = ++runToken;
       clearResults();
+      // 上一轮的结果已经清空，比对横幅也跟着回到“等待计算结果”，重算、取消或出错后不再留着旧结论。
+      updateComparison();
       isCalculating = true;
       updateComputeButton();
       setStatus('正在读取文件并计算摘要…');
