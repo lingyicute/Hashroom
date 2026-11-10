@@ -924,6 +924,7 @@
 
     .text-button {
       min-height: 40px;
+      flex-shrink: 0;
       display: inline-flex;
       align-items: center;
       justify-content: center;
@@ -934,6 +935,7 @@
       color: var(--primary);
       font-size: 13px;
       font-weight: 650;
+      white-space: nowrap;
     }
 
     .text-button:hover:not(:disabled) {
@@ -1165,6 +1167,16 @@
         display: none;
       }
 
+      .compare-tools {
+        flex-wrap: wrap;
+      }
+
+      .action-row {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 12px;
+      }
+
       .primary-button {
         width: 100%;
       }
@@ -1191,7 +1203,6 @@
 
       .section-head,
       .compare-tools,
-      .action-row,
       .results-heading {
         align-items: flex-start;
         flex-direction: column;
