@@ -127,6 +127,11 @@ async function main() {
   flaky.arrayBuffer = () => Promise.reject(new Error('out of memory'));
   const fallback = await hashFile(flaky, ['SHA-256', 'MD5'], 1, () => {});
   fallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile fallback ${item.algorithm}`));
+  // 一次性读取没有报错、却只读到一部分时，同样不能算出截断数据的摘要，应退回流式处理。
+  const shortFirstRead = new Blob([buf]);
+  shortFirstRead.arrayBuffer = () => Promise.resolve(buf.subarray(0, 1048576));
+  const shortFallback = await hashFile(shortFirstRead, ['SHA-256', 'MD5'], 1, () => {});
+  shortFallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile short-read fallback ${item.algorithm}`));
   // 没有 Blob.arrayBuffer() 的旧浏览器应通过 FileReader 读取，结果保持一致。
   globalThis.FileReader = class {
     readAsArrayBuffer(blob) {

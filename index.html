@@ -3006,6 +3006,9 @@
       if (useBuffer) {
         try {
           bytes = new Uint8Array(await readBlob(file));
+          // 一次性读到的字节数对不上文件大小时不能悄悄按截断的数据算：改走流式处理，
+          // 流式那边会逐块核对长度，读不全时会显式报错。
+          if (bytes.length !== file.size) bytes = null;
         } catch (error) {
           // 内存不足或一次性读取失败时，退回到分块流式处理。
           bytes = null;
