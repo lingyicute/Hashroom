@@ -322,6 +322,12 @@ async function main() {
   assert.strictEqual(entriesForFile(list.entries, 'other.iso').ignored, 3);
   assert.strictEqual(entriesForFile(list.entries, 'missing.iso').ignored, 0);
   assert.strictEqual(entriesForFile(list.entries, '').entries.length, 5);
+  // 只用一个空格或制表符分隔哈希与文件名的清单（脚本输出、表格粘贴）也要认出文件名，才能按文件筛选。
+  assert.deepStrictEqual(parseExpected(`${sha256} ubuntu.iso`).entries.map(entry => entry.file), ['ubuntu.iso']);
+  assert.deepStrictEqual(parseExpected(`${sha256}\t./sub/other.iso`).entries.map(entry => entry.file), ['other.iso']);
+  assert.deepStrictEqual(parseExpected(`sha256sum ${sha256} dir/win.iso`).entries.map(entry => [entry.algorithm, entry.file]), [['SHA-256', 'win.iso']]);
+  // 分隔符后是另一段十六进制（分组哈希的后续片段）时不能当成文件名。
+  assert.strictEqual(parseExpected(`${sha256.slice(0, 32)} ${sha256.slice(32)}`).entries[0].file, '');
   // 超长的行不能拖慢解析（输入框每次改动都会重新解析）。
   const started = performance.now();
   const hostile = parseExpected(`${'sha256 '.repeat(20000)}\n${'ab '.repeat(40000)}\n${sha256}  ok.iso`);
