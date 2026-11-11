@@ -2423,6 +2423,10 @@
       if (bsd) return {content: `${bsd[1]} = ${bsd[3]}`, file: baseName(bsd[2])};
       const sum = text.match(/^((?:\w+sum\s+)?([0-9a-fA-F]{8,128}))(?: [ *])(.+)$/);
       if (sum && HASH_LENGTHS.has(sum[2].length)) return {content: sum[1], file: baseName(sum[3])};
+      // 不少脚本和表格只用一个空格或制表符分隔哈希与文件名（如 Python 的 print、电子表格粘贴）。
+      // 只有余下部分带扩展名或路径分隔符、明显是文件名时才这样拆，免得把分组哈希的后续片段当成文件名。
+      const spaced = text.match(/^((?:\w+sum\s+)?([0-9a-fA-F]{32,128}))[ \t]+(\S.*)$/);
+      if (spaced && HASH_LENGTHS.has(spaced[2].length) && /[./\\]/.test(spaced[3])) return {content: spaced[1], file: baseName(spaced[3])};
       return {content: line, file: ''};
     }
 
