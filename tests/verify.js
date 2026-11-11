@@ -209,7 +209,11 @@ async function main() {
     [`sha512_256 = ${sha256}`, 'SHA-512/256', 64],
     [`SHA_256: ${sha256}`, 'SHA-256', 64],
     [`SHA512t256 (file.iso) = ${sha256}`, 'SHA-512/256', 64],
-    [`${sha256}  sha3_256.txt`, null, 64]
+    [`${sha256}  sha3_256.txt`, null, 64],
+    // 分组哈希用多个空白、或两侧带空格的分隔符书写时，仍应拼回完整的哈希，而不是把第一组误认成 CRC32。
+    [`SHA-256: ${sha256.match(/.{8}/g).join('  ')}`, 'SHA-256', 64],
+    [`SHA-256: ${sha256.match(/.{8}/g).join(' - ')}`, 'SHA-256', 64],
+    [`SHA-256: ${sha256.match(/.{8}/g).join(' : ')}`, 'SHA-256', 64]
   ];
   cases.forEach(([line, algorithm, length]) => {
     const parsed = parseExpected(line);

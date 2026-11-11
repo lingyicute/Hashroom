@@ -2305,8 +2305,9 @@
       // 输入框每次改动都要重新解析，下面的双重循环会反复用到分隔符、相邻关系和分组判断，
       // 这里一次算好，免得挤满短片段的行反复切片、逐个比较而拖慢页面。
       const seps = tokens.slice(1).map((token, i) => text.slice(found[i].index + found[i][0].length, found[i + 1].index));
-      // 两个片段之间只隔着单个空白或常见分隔符时才算同一个哈希的相邻分组；双空格是 sha256sum 文件名分隔符。
-      const adjacency = seps.map(value => /^(?: |\t|[:\-_,，：]\s*)$/.test(value));
+      // 两个片段之间只隔着空白或常见分隔符（分隔符两侧可以带空白）时才算同一个哈希的相邻分组。
+      // 裸的 sha256sum 行已先被 splitChecksumLine 拆掉文件名，走到这里的连续空白按分组处理，不会把文件名拼进来。
+      const adjacency = seps.map(value => /^(?:\s+|\s*[:\-_,，：]\s*)$/.test(value));
       // 分组书写的哈希（如 8 位一组）各组等长，仅最后一组可以更短；
       // 文件名里恰好由十六进制字符组成的片段不满足这一点，不能被拼进哈希。
       // sameRun[i] 是从第 i 段起连续等长的段数，判断 tokens[start..end] 能否成组只需常数时间。
