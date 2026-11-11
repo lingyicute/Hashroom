@@ -165,6 +165,14 @@ async function main() {
     slice: start => new Blob([buf.subarray(0, start === 0 ? 1048576 : 1000)])
   };
   await assert.rejects(hashFile(short, ['MD5'], 1, () => {}), /Unexpected end of file/);
+  // 读取超过请求的范围也不能算出包含额外字节的错误摘要（包括不足一块的末块）。
+  for (const [size, badOffset] of [[2 * 1048576, 0], [1048576 + 1000, 1048576]]) {
+    const oversized = {
+      size,
+      slice: (start, end) => new Blob([buf.subarray(start, Math.min(end + (start === badOffset ? 1 : 0), size + 1))])
+    };
+    await assert.rejects(hashFile(oversized, ['MD5'], 1, () => {}), /Unexpected end of file/);
+  }
   // 末块本来就比分块小，完整读到时照常通过。
   const oddSize = 1048576 + 1000;
   const odd = {size: oddSize, slice: (start, end) => new Blob([buf.subarray(start, Math.min(end, oddSize))])};

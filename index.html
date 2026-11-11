@@ -3076,8 +3076,8 @@
         const bytes = await next;
         // 等待读取期间可能已经取消：不再预读下一块，也不再白白计算这一块。
         if (token !== runToken) return null;
-        // 读到的比应有的短（含空分块）时，offset 仍会照常前进，等于悄悄跳过数据、算出错误摘要，所以直接报错。
-        if (bytes.length < Math.min(sliceSize, file.size - offset)) throw new Error('Unexpected end of file');
+        // 分块长度与请求范围不符时，继续计算会跳过缺失数据或混入额外字节，产生错误摘要。
+        if (bytes.length !== Math.min(sliceSize, file.size - offset)) throw new Error('Unexpected end of file');
         next = offset + sliceSize < file.size ? readSlice(offset + sliceSize) : null;
         // 同时选了很多算法时，一块数据要算很久，每个算法之后都检查一次是否该让出线程。
         for (const item of hashers) {
