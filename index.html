@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-hJRbf5wwtYzHJzIwBG75r+VGLUmHjYrxPKCO8zkt+gc='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-yutuCiHImQYY7gj8SJ19kq6dJTkIYV2oo1BAcyMj+lk='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2906,7 +2906,9 @@
       // 计算中按钮变成“取消计算”，大文件不必等到算完或者靠改选项才能中止。
       computeButton.disabled = !isCalculating && (!selectedFile || !selectedAlgorithms().length);
       computeLabel.textContent = isCalculating ? '取消计算' : (hasExpectedValue() ? '计算并比对' : '计算哈希');
-      computeIcon.hidden = isCalculating;
+      // SVG 元素没有 HTMLElement.hidden 属性，需要直接设置隐藏特性。
+      if (isCalculating) computeIcon.setAttribute('hidden', '');
+      else computeIcon.removeAttribute('hidden');
       buttonSpinner.hidden = !isCalculating;
       // 只在计算期间挂上离开确认：Firefox 不会把带 beforeunload 监听的页面放进往返缓存（bfcache）。
       if (isCalculating) window.addEventListener('beforeunload', confirmLeave);

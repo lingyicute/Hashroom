@@ -91,8 +91,12 @@ async function cancellation(page, url) {
   await compute(page);
   await page.waitForFunction(() => window.pendingDigests.length === 1);
   assert.equal(await page.getByRole('progressbar', {name: '摘要计算进度'}).getAttribute('aria-valuenow'), '0');
+  assert.ok(await page.locator('#computeIcon').isHidden());
+  assert.ok(await page.locator('#buttonSpinner').isVisible());
   await page.getByRole('button', {name: '取消计算'}).click();
   assert.match(await page.locator('#statusLine').textContent(), /已取消/);
+  assert.ok(await page.locator('#computeIcon').isVisible());
+  assert.ok(await page.locator('#buttonSpinner').isHidden());
   await choose(page, 'current.txt', 'def');
   await expected(page, checksum('def'));
   await compute(page);
