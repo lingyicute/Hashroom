@@ -183,6 +183,10 @@ async function dragAndTheme(page, url) {
   assert.ok(dropped);
   assert.match(await page.locator('#fileNotice').textContent(), /不支持文件夹/);
   assert.equal(await page.locator('#fileName').textContent(), 'first.txt');
+  const extension = 'x'.repeat(180);
+  await choose(page, `long.${extension}`);
+  assert.ok((await page.locator('#fileMeta').textContent()).startsWith(extension.toUpperCase()));
+  assert.equal(await page.evaluate(() => document.documentElement.scrollWidth), 280);
 }
 
 async function main() {
