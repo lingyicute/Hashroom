@@ -256,7 +256,11 @@ async function checkLargeStream() {
 
 async function main() {
   checkScriptPolicy(src);
-  console.log('ok    CSP script hashes');
+  assert.throws(() => checkScriptPolicy(src.replace('<head>', '<head><script>/* 检查顺序 */</script>')), /出现在页面资源之前/);
+  assert.throws(() => checkScriptPolicy(src.replace("default-src 'none'", "default-src 'self'")), /本地处理限制/);
+  assert.throws(() => checkScriptPolicy(src.replace("form-action 'none'", "form-action 'none'; connect-src 'self'")), /覆盖限制/);
+  assert.throws(() => checkScriptPolicy(src.replace("default-src 'none'", "default-src 'none'; default-src 'self'")), /重复的 CSP 指令/);
+  console.log('ok    CSP placement, restrictions and script hashes');
   checkBitLength();
   checkDurationFormat();
   checkFileMetadata();
