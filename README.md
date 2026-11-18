@@ -58,7 +58,7 @@ Web Crypto 在非安全上下文（非 HTTPS、非 localhost）下不可用，�
 npm test    # 等价于 node tests/verify.js
 ```
 
-脚本会从 `index.html` 中提取摘要实现，与 Node 内置 `crypto` 对比不同长度、不同分块方式下的结果，核对启动自检所用的标准向量，并测试预期值解析逻辑。CRC32 的对比需要 Node 22 及以上（`zlib.crc32`）。
+脚本用可复现的数据对照 Node 内置 `crypto`，验证全部算法、分块方式和跨 512 MiB 的流式边界，也检查自检向量、取消读取、预期值解析与判定。CRC32 优先用 Node 的 `zlib.crc32` 对照；没有该接口时用独立的逐位参考实现。
 
 修改 `index.html` 中的脚本后，先运行 `node tests/check-csp.js --write` 更新 CSP 白名单；`npm test` 会检查其是否与脚本一致。
 

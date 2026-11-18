@@ -4,6 +4,7 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('node:zlib');
 const assert = require('assert');
 const {checkScriptPolicy} = require('./check-csp');
 
@@ -37,8 +38,34 @@ const NODE_NAMES = {
   'RIPEMD-160': 'ripemd160'
 };
 
+// 保持数据和分块可重现，同时覆盖高位字节与不规则步长。
+let state = 0xa53c9bef;
+function randomWord() {
+  state ^= state << 13;
+  state ^= state >>> 17;
+  state ^= state << 5;
+  return state >>> 0;
+}
+
+function fixture(size) {
+  const bytes = Buffer.allocUnsafe(size);
+  for (let i = 0; i < size; i += 1) bytes[i] = randomWord() & 255;
+  return bytes;
+}
+
+function referenceCrc32(buf) {
+  if (typeof zlib.crc32 === 'function') return zlib.crc32(buf);
+  // Node 22.0/22.1 还没有 zlib.crc32；用逐位参考实现，不能跳过 CRC32 掩盖问题。
+  let crc = -1;
+  for (const byte of buf) {
+    crc ^= byte;
+    for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (crc & 1 ? 0xedb88320 : 0);
+  }
+  return (~crc) >>> 0;
+}
+
 function expected(id, buf) {
-  if (id === 'CRC32') return require('zlib').crc32(buf).toString(16).padStart(8, '0');
+  if (id === 'CRC32') return referenceCrc32(buf).toString(16).padStart(8, '0');
   return crypto.createHash(NODE_NAMES[id]).update(buf).digest('hex');
 }
 
@@ -89,10 +116,8 @@ function checkFileMetadata() {
 // 启动自检用的标准向量本身必须正确，否则浏览器里会误停用算法。
 function checkSelfTestVectors() {
   const vectors = new Function(`${cut('const MSG56 =', 'const failed = new Set()')}\nreturn vectors;`)();
-  const hasCrc = typeof require('zlib').crc32 === 'function';
   const text = new TextEncoder();
   vectors.forEach(([id, message, want]) => {
-    if (id === 'CRC32' && !hasCrc) return;
     assert.strictEqual(want, expected(id, Buffer.from(text.encode(message))), `自检向量有误：${id} "${message.slice(0, 12)}"`);
   });
   console.log('ok    self-test vectors', vectors.length);
@@ -190,6 +215,33 @@ async function checkCancellation() {
   console.log('ok    aborting reads and bounding native digest work');
 }
 
+async function checkLargeStream() {
+  // 512 MiB 后的位数不再能放进 32 位。复用测试块，避免在测试机上分配整个文件。
+  const chunkSize = 1024 * 1024;
+  const size = 2 ** 29 + 13;
+  const chunk = Uint8Array.from(fixture(chunkSize));
+  const tail = chunk.slice(0, size % chunkSize);
+  let reads = 0;
+  const file = {
+    size,
+    arrayBuffer() { assert.fail('大文件必须分块读取'); },
+    slice(start, end) {
+      assert.strictEqual(start, reads++ * chunkSize);
+      assert.strictEqual(end, Math.min(start + chunkSize, size));
+      return {arrayBuffer: async () => (end - start === chunkSize ? chunk : tail).buffer};
+    }
+  };
+  const reference = crypto.createHash('sha256');
+  for (let offset = 0; offset + chunkSize <= size; offset += chunkSize) reference.update(chunk);
+  reference.update(tail);
+  let progress;
+  const [digest] = await hashFile(file, ['SHA-256'], freshSignal(), value => { progress = value; });
+  assert.equal(digest.hex, reference.digest('hex'));
+  assert.equal(reads, Math.ceil(size / chunkSize));
+  assert.equal(progress, 1);
+  console.log('ok    streaming across the 32-bit bit-length boundary');
+}
+
 async function main() {
   checkScriptPolicy(src);
   console.log('ok    CSP script hashes');
@@ -198,20 +250,18 @@ async function main() {
   checkFileMetadata();
   checkSelfTestVectors();
   checkComparison();
-  const hasCrc = typeof require('zlib').crc32 === 'function';
   const sizes = [];
   for (let i = 0; i <= 300; i += 1) sizes.push(i);
   sizes.push(4096, 65537, 1048576 + 13);
 
   for (const {id} of ALGORITHMS) {
-    if (id === 'CRC32' && !hasCrc) continue;
     for (const size of sizes) {
-      const buf = crypto.randomBytes(size);
+      const buf = fixture(size);
       const want = expected(id, buf);
       assert.strictEqual(digestBytes(id, buf), want, `${id} 一次性计算失败 (${size} 字节)`);
       const hasher = createHasher(id);
       for (let offset = 0; offset < size;) {
-        const step = 1 + Math.floor(Math.random() * 200);
+        const step = 1 + randomWord() % 200;
         hasher.update(buf.subarray(offset, offset + step));
         offset += step;
       }
@@ -220,7 +270,7 @@ async function main() {
     console.log('ok   ', id);
   }
 
-  const buf = crypto.randomBytes(3 * 1048576 + 7);
+  const buf = fixture(3 * 1048576 + 7);
   for (const ids of [['SHA-256'], ['SHA-256', 'MD5', 'SHA3-256'], ['MD5', 'SHA-512/256']]) {
     const results = await hashFile(new Blob([buf]), ids, freshSignal(), () => {});
     results.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile ${item.algorithm}`));
@@ -283,6 +333,7 @@ async function main() {
   assert.strictEqual(oddResult[0].hex, crypto.createHash('md5').update(buf.subarray(0, oddSize)).digest('hex'));
   console.log('ok    hashFile');
   await checkCancellation();
+  await checkLargeStream();
 
   const sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
   const spaced = sha256.match(/.{8}/g).join(' ');
