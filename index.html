@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-yutuCiHImQYY7gj8SJ19kq6dJTkIYV2oo1BAcyMj+lk='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-HvsmiRH05YTdbOLlQVggPwzvNU8m5OgIrhSZd2hvdxg='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -3042,11 +3042,7 @@
       lastElapsed = '';
       copyAllButton.disabled = true;
       clearCopyFeedback();
-      const previous = copyTimers.get(copyAllButton);
-      if (previous) clearTimeout(previous);
-      const icon = copyAllButton.querySelector('.copy-icon');
-      if (icon) icon.innerHTML = iconMarkup.copy;
-      copyAllButton.classList.remove('is-copied');
+      resetCopyButton(copyAllButton);
     }
 
     function onAlgorithmsChanged() {
@@ -3145,8 +3141,18 @@
       copyStatus.classList.remove('is-error');
     }
 
+    function resetCopyButton(button) {
+      clearTimeout(copyTimers.get(button));
+      copyTimers.delete(button);
+      if (!button.classList.contains('is-copied')) return;
+      const icon = button.querySelector('.copy-icon');
+      if (icon) icon.innerHTML = iconMarkup.copy;
+      button.classList.remove('is-copied');
+    }
+
     async function copyText(text, button, message) {
       clearCopyFeedback();
+      resetCopyButton(button);
       const request = copyRequest;
       const stillCurrent = () => copyRequest === request && button.isConnected && !button.disabled;
       try {
@@ -3168,14 +3174,7 @@
         copyStatusTimer = setTimeout(() => {
           if (stillCurrent()) copyStatus.textContent = '';
         }, 2400);
-        const previous = copyTimers.get(button);
-        if (previous) clearTimeout(previous);
-        copyTimers.set(button, setTimeout(() => {
-          if (!button.isConnected) return;
-          const currentIcon = button.querySelector('.copy-icon');
-          if (currentIcon) currentIcon.innerHTML = iconMarkup.copy;
-          button.classList.remove('is-copied');
-        }, 1600));
+        copyTimers.set(button, setTimeout(() => resetCopyButton(button), 1600));
       } catch (error) {
         if (stillCurrent()) {
           copyStatus.classList.add('is-error');

@@ -125,6 +125,7 @@ async function clipboard(page, url) {
   await button.click();
   await page.waitForFunction(() => document.getElementById('copyStatus').textContent.includes('已复制'));
   assert.equal(await page.evaluate(() => window.copiedText), `SHA-256: ${checksum('abc')}`);
+  assert.equal(await page.locator('#copyAllButton.is-copied').count(), 1);
   await page.evaluate(() => {
     navigator.clipboard.writeText = () => Promise.reject(new Error('denied'));
     document.execCommand = () => { throw new Error('denied'); };
@@ -132,6 +133,7 @@ async function clipboard(page, url) {
   await button.focus();
   await button.click();
   await page.locator('#copyStatus.is-error').waitFor();
+  assert.equal(await page.locator('#copyAllButton.is-copied').count(), 0);
   assert.equal(await page.locator('textarea').count(), 1);
   assert.equal(await page.evaluate(() => document.activeElement.id), 'copyAllButton');
   assert.equal(await page.locator('#statusLine').textContent(), status);
