@@ -217,7 +217,6 @@ async function main() {
     ['d41d8cd9 8f00b204 e9800998 ecf8427e  deadbeef.bin', null, 32],
     ['d41d8cd98f00b204e9800998ecf8427e  da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 32],
     ['CRC32 (deadbeef) = cbf43926', 'CRC32', 8],
-    ['SHA-256: da39a3ee5e6b4b0d3255bfef95601890afd80709', null, 40],
     [`sha3_256: ${sha256}`, 'SHA3-256', 64],
     [`sha512_256 = ${sha256}`, 'SHA-512/256', 64],
     [`SHA_256: ${sha256}`, 'SHA-256', 64],
@@ -264,7 +263,30 @@ async function main() {
       });
     }
   }
-  assert.strictEqual(parseExpected('sha384 ' + sha256).entries[0].hex, sha256);
+  for (const line of [
+    `SHA-256: ${sha256.slice(0, 56)}`,
+    `SHA-256 (file) = ${sha256.slice(0, 56)}`,
+    `sha384 ${sha256}`,
+    `${sha256} trailing garbage`,
+    `SHA-256: ${sha256}.zip`,
+    `SHA-256: ${sha256} / ${sha256}`,
+    `sha256-${sha256.slice(0, 56)}`,
+    `UNKNOWN256 (file) = ${sha256}`
+  ]) assert.strictEqual(parseExpected(line).invalid, true, line);
+  const wrongLength = parseExpected(`SHA-256: ${sha256.slice(0, 56)}`);
+  assert.deepStrictEqual(wrongLength.malformed, {algorithm: 'SHA-256', strayLength: 56});
+  for (const separator of ['  ', '\t', ' , ', ' : ']) {
+    const grouped = parseExpected(sha256.match(/.{8}/g).join(separator));
+    assert.deepStrictEqual(grouped.entries.map(entry => [entry.hex, entry.file]), [[sha256, '']], separator);
+  }
+  const sri = ['sha256', 'sha384'].map(id => `${id}-${crypto.createHash(id).update('abc').digest('base64')}`);
+  const sriResult = parseExpected(`${sri[0]}?option=1 ${sri[1]}`);
+  assert.deepStrictEqual(sriResult.entries.map(entry => entry.algorithm), ['SHA-256', 'SHA-384']);
+  assert.deepStrictEqual(parseExpected(`# ${sha256}\n; ${sha256}`).entries, []);
+  const tooLarge = parseExpected(`${sha256}\n${'copy '.repeat(60000)}`);
+  assert.strictEqual(tooLarge.tooLarge, true);
+  assert.strictEqual(tooLarge.invalid, true);
+  assert.deepStrictEqual(tooLarge.entries, []);
   assert.strictEqual(parseExpected('garbage').invalid, true);
   assert.strictEqual(parseExpected('deafbeefs').invalid, true);
   assert.strictEqual(parseExpected('deadbeef.bin').invalid, true);
@@ -335,7 +357,7 @@ async function main() {
   assert.deepStrictEqual(parseExpected(`${sha256}\t./sub/other.iso`).entries.map(entry => entry.file), ['other.iso']);
   assert.deepStrictEqual(parseExpected(`sha256sum ${sha256} dir/win.iso`).entries.map(entry => [entry.algorithm, entry.file]), [['SHA-256', 'win.iso']]);
   // 分隔符后是另一段十六进制（分组哈希的后续片段）时不能当成文件名。
-  assert.strictEqual(parseExpected(`${sha256.slice(0, 32)} ${sha256.slice(32)}`).entries[0].file, '');
+  assert.deepStrictEqual(parseExpected(`${sha256.slice(0, 32)} ${sha256.slice(32)}`).entries, [{algorithm: null, hex: sha256, file: ''}]);
   // 超长的行不能拖慢解析（输入框每次改动都会重新解析）。
   const started = performance.now();
   const hostile = parseExpected(`${'sha256 '.repeat(20000)}\n${'ab '.repeat(40000)}\n${sha256}  ok.iso`);
