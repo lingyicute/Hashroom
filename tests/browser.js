@@ -60,6 +60,8 @@ async function offline(page) {
 
 async function verdicts(page, url) {
   await page.goto(url);
+  const defaultHint = await page.locator('#compareHint').textContent();
+  assert.match(defaultHint, /十六进制.*Base64 和文件名区分大小写/);
   await choose(page, 'current.txt');
   await expected(page, `SHA256 (other.txt) = ${checksum('abc')}`);
   await compute(page);
@@ -80,6 +82,7 @@ async function verdicts(page, url) {
   await banner(page, 'info', /已匹配 SHA-256/);
   await page.locator('#clearExpected').click();
   assert.equal(await page.locator('.match-pill').count(), 0);
+  assert.equal(await page.locator('#compareHint').textContent(), defaultHint);
   await page.locator('#clearFile').click();
   assert.equal(await page.evaluate(() => document.activeElement.id), 'dropzone');
 }

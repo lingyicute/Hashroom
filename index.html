@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-eLN1EMnkNLdaqzrbcSF1OrEQl59Wj1mcqmoK0NYDUCI='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-1zZ8e5EcfAMmWEyjmrESTjO85sJfSlo7CAMe2hzYAPc='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -1456,7 +1456,7 @@
               autocorrect="off" autocomplete="off" aria-describedby="compareHint" placeholder="粘贴预期哈希，例如 SHA-256: e3b0c442… 或 sha256sum 输出"></textarea>
           </label>
           <div class="compare-tools">
-            <p class="compare-hint" id="compareHint">计算完成后会自动比对，忽略大小写和分隔符。</p>
+            <p class="compare-hint" id="compareHint">十六进制摘要可忽略大小写和分隔符；Base64 和文件名区分大小写。</p>
             <button class="text-button" id="applySuggested" type="button" hidden>补选可能的算法</button>
           </div>
           <div class="compare-banner" id="compareBanner" hidden role="status" aria-live="polite"></div>
@@ -1546,6 +1546,7 @@
     const algorithmCount = document.getElementById('algorithmCount');
     const expectedInput = document.getElementById('expectedInput');
     const compareHint = document.getElementById('compareHint');
+    const defaultCompareHint = compareHint.textContent;
     const compareBanner = document.getElementById('compareBanner');
     const applySuggested = document.getElementById('applySuggested');
     const clearExpected = document.getElementById('clearExpected');
@@ -2772,7 +2773,7 @@
       // 只含零宽字符之类的输入解析不出任何一行，同样按没有填写处理。
       if (!parsed.entries.length && !parsed.invalid) {
         compareBanner.hidden = true;
-        compareHint.textContent = '计算完成后会自动比对，忽略大小写和分隔符。';
+        compareHint.textContent = defaultCompareHint;
         return;
       }
       if (parsed.invalid) {
