@@ -75,6 +75,16 @@ function checkDurationFormat() {
   console.log('ok    duration format');
 }
 
+function checkFileMetadata() {
+  const {formatBytes, describeFile} = new Function(`${cut('function formatBytes', 'function hasExpectedValue')}\nreturn {formatBytes, describeFile};`)();
+  for (const [bytes, label] of [[0, '0 B'], [1023, '1023 B'], [1024, '1.0 KiB'], [1536, '1.5 KiB'], [2 ** 20, '1.0 MiB'], [2 ** 50, '1.0 PiB']]) {
+    assert.strictEqual(formatBytes(bytes), label);
+  }
+  const epoch = new Date(0).toLocaleDateString('zh-CN', {year: 'numeric', month: '2-digit', day: '2-digit'});
+  assert.strictEqual(describeFile({name: 'empty.txt', size: 0, lastModified: 0}), `TXT · 0 B · ${epoch}`);
+  console.log('ok    file metadata');
+}
+
 // 启动自检用的标准向量本身必须正确，否则浏览器里会误停用算法。
 function checkSelfTestVectors() {
   const vectors = new Function(`${cut('const MSG56 =', 'const failed = new Set()')}\nreturn vectors;`)();
@@ -182,6 +192,7 @@ async function checkCancellation() {
 async function main() {
   checkBitLength();
   checkDurationFormat();
+  checkFileMetadata();
   checkSelfTestVectors();
   checkComparison();
   const hasCrc = typeof require('zlib').crc32 === 'function';
