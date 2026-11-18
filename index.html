@@ -3305,6 +3305,19 @@
       }
     }
 
+    function calculationController() {
+      if (typeof AbortController === 'function') return new AbortController();
+      // 旧 WebView 仍有可中止的 FileReader；用本地事件传递取消，不依赖全局 polyfill。
+      const events = document.createDocumentFragment();
+      const signal = {aborted: false, addEventListener: events.addEventListener.bind(events),
+        removeEventListener: events.removeEventListener.bind(events)};
+      return {signal, abort() {
+        if (signal.aborted) return;
+        signal.aborted = true;
+        events.dispatchEvent(new Event('abort'));
+      }};
+    }
+
     function stopCalculation() {
       const controller = activeCalculation;
       activeCalculation = null;
@@ -3330,7 +3343,7 @@
         return;
       }
       const file = selectedFile;
-      const controller = new AbortController();
+      const controller = calculationController();
       const {signal} = controller;
       clearResults();
       // 上一轮的结果已经清空，比对横幅也跟着回到“等待计算结果”，重算、取消或出错后不再留着旧结论。
@@ -3545,15 +3558,17 @@
         ['SHA3-512', MSG112, 'afebb2ef542e6579c50cad06d2e578f9f8dd6881d7dc824d26360feebf18a4fa73e3261122948efcfd492e74e82e2189ed0fb440d187f382270cb455f21dd185']
       ];
       const failed = new Set();
-      const encoder = new TextEncoder();
+      const encoder = typeof TextEncoder === 'function' ? new TextEncoder() : null;
+      // 自检向量全是 ASCII；旧 WebView 没有 TextEncoder 时仍能运行自检。
+      const encode = text => encoder ? encoder.encode(text) : Uint8Array.from(text, char => char.charCodeAt(0));
       vectors.forEach(([id, text, expected]) => {
         try {
-          if (digestBytes(id, encoder.encode(text)) !== expected) failed.add(id);
+          if (digestBytes(id, encode(text)) !== expected) failed.add(id);
         } catch (error) {
           failed.add(id);
         }
       });
-      const sample = encoder.encode(MSG112 + MSG56);
+      const sample = encode(MSG112 + MSG56);
       ALGORITHMS.forEach(item => {
         try {
           const whole = digestBytes(item.id, sample);
