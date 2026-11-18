@@ -564,6 +564,10 @@ async function main() {
   assert.ok(performance.now() - crowdedStart < 500, '短片段密集的行解析太慢');
   assert.strictEqual(crowded.entries.length, 1);
   assert.strictEqual(crowded.invalidLines, 50);
+  const paddingStart = performance.now();
+  const padded = parseExpected(`ab${' '.repeat(2030)}\n`.repeat(125));
+  assert.strictEqual(padded.invalidLines, 125);
+  assert.ok(performance.now() - paddingStart < 300, '带大量行尾空格的输入解析太慢');
   console.log('ok    parseExpected');
 }
 
