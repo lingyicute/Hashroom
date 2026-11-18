@@ -15,22 +15,19 @@ const cut = (from, to) => {
 };
 
 const code = [
-  cut('const ALGORITHMS = [', 'const WEB_CRYPTO'),
-  "const WEB_CRYPTO = new Set(['SHA-1', 'SHA-256', 'SHA-384', 'SHA-512']);",
-  'const BUFFER_LIMIT = 256 * 1024 * 1024;',
+  cut('const ALGORITHMS = [', 'const DROPZONE_LABEL'),
   'const HASH_LENGTHS = new Set(ALGORITHMS.map(item => item.bits / 4));',
-  'let runToken = 1; const window = globalThis;',
-  // 让出线程的辅助函数在 Node 里会让 MessagePort 挂住事件循环，测试中走 setTimeout 的退路。
+  // 避免 MessagePort 挂住 Node 的事件循环，走 setTimeout 退路。
   'const MessageChannel = undefined;',
   cut('function rotl32', 'function firstDifference'),
-  'globalThis.__writeBitLength = writeBitLength;',
   cut('function canonicalAlgorithm', 'function missingCandidates'),
-  cut('const yieldQueue', 'async function computeHashes'),
-  'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile, compareDigests};'
+  cut('const yieldQueue', '// 结果已经显示时'),
+  'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile, compareDigests, writeBitLength};'
 ].join('\n');
 
-const {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile, compareDigests} =
-  new Function('crypto', 'performance', code)(crypto.webcrypto, performance);
+const loadHashroom = (subtle = crypto.webcrypto.subtle) => new Function('window', 'performance', code)({crypto: {subtle}}, performance);
+const {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile, compareDigests, writeBitLength} = loadHashroom();
+const freshSignal = () => new AbortController().signal;
 
 const NODE_NAMES = {
   'MD5': 'md5', 'SHA-1': 'sha1', 'SHA-224': 'sha224', 'SHA-256': 'sha256', 'SHA-384': 'sha384',
@@ -45,12 +42,11 @@ function expected(id, buf) {
 }
 
 function checkBitLength() {
-  const write = globalThis.__writeBitLength;
   const sizes = [0, 1, 55, 2 ** 29 - 1, 2 ** 29, 2 ** 32, 2 ** 32 + 5, 2 ** 40 + 12345, 2 ** 50 + 7, Number.MAX_SAFE_INTEGER];
   for (const size of sizes) {
     for (const [width, little] of [[8, false], [8, true], [16, false]]) {
       const buf = new Uint8Array(16);
-      write(buf, 0, size, width, little);
+      writeBitLength(buf, 0, size, width, little);
       const bytes = Array.from(buf.subarray(0, width));
       if (little) bytes.reverse();
       const got = bytes.reduce((acc, byte) => (acc << 8n) | BigInt(byte), 0n);
@@ -126,6 +122,63 @@ function checkComparison() {
   console.log('ok    comparison decisions');
 }
 
+async function checkCancellation() {
+  const blob = new Blob([Buffer.alloc(2 * 1048576 + 3, 7)]);
+  const want = expected('SHA-256', Buffer.alloc(blob.size, 7));
+  let started;
+  let complete;
+  let nativeCalls = 0;
+  const ready = new Promise(resolve => { started = resolve; });
+  const delayed = loadHashroom({digest() {
+    nativeCalls += 1;
+    if (nativeCalls > 1) return new Uint8Array(1).buffer; // 损坏的原生结果必须回退。
+    started();
+    return new Promise(resolve => { complete = resolve; });
+  }});
+  const firstRun = new AbortController();
+  const progress = [];
+  const first = delayed.hashFile(blob, ['SHA-256'], firstRun.signal, value => progress.push(value));
+  await ready;
+  firstRun.abort();
+  assert.deepStrictEqual(await delayed.hashFile(blob, ['SHA-256'], freshSignal(), () => {}), [{algorithm: 'SHA-256', hex: want}]);
+  assert.strictEqual(nativeCalls, 1, '旧的原生计算未返回时不能再读一个整文件');
+  complete(new Uint8Array(32).buffer);
+  assert.strictEqual(await first, null);
+  assert.deepStrictEqual(progress, [0]);
+  assert.deepStrictEqual(await delayed.hashFile(blob, ['SHA-256'], freshSignal(), () => {}), [{algorithm: 'SHA-256', hex: want}]);
+  assert.strictEqual(nativeCalls, 2);
+
+  let reads = 0;
+  let aborts = 0;
+  let finishFirstSlice = false;
+  globalThis.FileReader = class {
+    readAsArrayBuffer(part) {
+      reads += 1;
+      if (finishFirstSlice && reads === 1) {
+        part.arrayBuffer().then(buffer => { this.result = buffer; if (this.onload) this.onload(); });
+      }
+    }
+    abort() { aborts += 1; }
+  };
+  try {
+    const reading = new AbortController();
+    const buffered = hashFile(blob, ['SHA-256'], reading.signal, () => assert.fail('不应计算已取消的读取'));
+    assert.strictEqual(reads, 1);
+    reading.abort();
+    assert.strictEqual(await buffered, null);
+    assert.strictEqual(aborts, 1);
+    reads = 0;
+    finishFirstSlice = true;
+    const streaming = new AbortController();
+    assert.strictEqual(await hashFile(blob, ['MD5'], streaming.signal, () => streaming.abort()), null);
+    assert.strictEqual(reads, 2, '曾经预读下一块，但不会继续读第三块');
+    assert.strictEqual(aborts, 2, '预读也应中止');
+  } finally {
+    delete globalThis.FileReader;
+  }
+  console.log('ok    aborting reads and bounding native digest work');
+}
+
 async function main() {
   checkBitLength();
   checkDurationFormat();
@@ -155,18 +208,18 @@ async function main() {
 
   const buf = crypto.randomBytes(3 * 1048576 + 7);
   for (const ids of [['SHA-256'], ['SHA-256', 'MD5', 'SHA3-256'], ['MD5', 'SHA-512/256']]) {
-    const results = await hashFile(new Blob([buf]), ids, 1, () => {});
+    const results = await hashFile(new Blob([buf]), ids, freshSignal(), () => {});
     results.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile ${item.algorithm}`));
   }
   // 一次性读取失败时应退回到流式处理，结果保持一致。
   const flaky = new Blob([buf]);
   flaky.arrayBuffer = () => Promise.reject(new Error('out of memory'));
-  const fallback = await hashFile(flaky, ['SHA-256', 'MD5'], 1, () => {});
+  const fallback = await hashFile(flaky, ['SHA-256', 'MD5'], freshSignal(), () => {});
   fallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile fallback ${item.algorithm}`));
   // 一次性读取没有报错、却只读到一部分时，同样不能算出截断数据的摘要，应退回流式处理。
   const shortFirstRead = new Blob([buf]);
   shortFirstRead.arrayBuffer = () => Promise.resolve(buf.subarray(0, 1048576));
-  const shortFallback = await hashFile(shortFirstRead, ['SHA-256', 'MD5'], 1, () => {});
+  const shortFallback = await hashFile(shortFirstRead, ['SHA-256', 'MD5'], freshSignal(), () => {});
   shortFallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile short-read fallback ${item.algorithm}`));
   // 没有 Blob.arrayBuffer() 的旧浏览器应通过 FileReader 读取，结果保持一致。
   globalThis.FileReader = class {
@@ -185,7 +238,7 @@ async function main() {
     return part;
   };
   for (const streaming of [false, true]) {
-    const results = await hashFile(legacy, streaming ? ['MD5'] : ['SHA-256', 'MD5'], 1, () => {});
+    const results = await hashFile(legacy, streaming ? ['MD5'] : ['SHA-256', 'MD5'], freshSignal(), () => {});
     results.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile legacy ${item.algorithm}`));
   }
   delete globalThis.FileReader;
@@ -194,27 +247,28 @@ async function main() {
     size: 2 * 1048576,
     slice: start => new Blob(start === 0 ? [buf.subarray(0, 1048576)] : [])
   };
-  await assert.rejects(hashFile(truncated, ['MD5'], 1, () => {}), /Unexpected end of file/);
+  await assert.rejects(hashFile(truncated, ['MD5'], freshSignal(), () => {}), /Unexpected file read length/);
   // 分块非空但比应有的短，同样不能悄悄算下去。
   const short = {
     size: 2 * 1048576,
     slice: start => new Blob([buf.subarray(0, start === 0 ? 1048576 : 1000)])
   };
-  await assert.rejects(hashFile(short, ['MD5'], 1, () => {}), /Unexpected end of file/);
+  await assert.rejects(hashFile(short, ['MD5'], freshSignal(), () => {}), /Unexpected file read length/);
   // 读取超过请求的范围也不能算出包含额外字节的错误摘要（包括不足一块的末块）。
   for (const [size, badOffset] of [[2 * 1048576, 0], [1048576 + 1000, 1048576]]) {
     const oversized = {
       size,
       slice: (start, end) => new Blob([buf.subarray(start, Math.min(end + (start === badOffset ? 1 : 0), size + 1))])
     };
-    await assert.rejects(hashFile(oversized, ['MD5'], 1, () => {}), /Unexpected end of file/);
+    await assert.rejects(hashFile(oversized, ['MD5'], freshSignal(), () => {}), /Unexpected file read length/);
   }
   // 末块本来就比分块小，完整读到时照常通过。
   const oddSize = 1048576 + 1000;
   const odd = {size: oddSize, slice: (start, end) => new Blob([buf.subarray(start, Math.min(end, oddSize))])};
-  const oddResult = await hashFile(odd, ['MD5'], 1, () => {});
+  const oddResult = await hashFile(odd, ['MD5'], freshSignal(), () => {});
   assert.strictEqual(oddResult[0].hex, crypto.createHash('md5').update(buf.subarray(0, oddSize)).digest('hex'));
   console.log('ok    hashFile');
+  await checkCancellation();
 
   const sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
   const spaced = sha256.match(/.{8}/g).join(' ');
