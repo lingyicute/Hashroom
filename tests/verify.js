@@ -372,6 +372,10 @@ async function main() {
 
   const sha256 = 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855';
   const spaced = sha256.match(/.{8}/g).join(' ');
+  for (const file of ['cafe  edition.iso', '   leading spaces.iso']) {
+    const groupedRecord = parseExpected(`${spaced}  ${file}`);
+    assert.deepStrictEqual(groupedRecord.entries, [{algorithm: null, hex: sha256, file, path: file}]);
+  }
   const cases = [
     [`SHA-256: ${spaced}`, 'SHA-256', 64],
     [`sha256sum ${sha256}  deadbeef.bin`, 'SHA-256', 64],

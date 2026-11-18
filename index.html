@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-WsodR/MTcnFYxmCCE+UNSFrYfYOyQCZ3+7gpXu2p3pw='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-eLN1EMnkNLdaqzrbcSF1OrEQl59Wj1mcqmoK0NYDUCI='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2561,8 +2561,8 @@
           return {tag, content: sum[1], ...checksumFile(name, escaped)};
         }
       }
-      // 前缀必须以十六进制字符结束，避免末尾大量空格被两段正则反复分配。
-      const grouped = text.match(/^([0-9a-fx:：,，_\t \-]*[0-9a-f])[ \t]{2,}(\S[\s\S]*)$/i);
+      // 首个双字符分隔符之后是文件名；不要把文件名开头的十六进制词吞进摘要。
+      const grouped = text.match(/^([0-9a-fx:：,，_\t \-]*?[0-9a-f])[ \t]{2}([\s\S]+)$/i);
       if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2])) {
         const hex = hexValue(grouped[1]);
         const groups = grouped[1].trim().split(/[\t :：,，_\-]+/);
