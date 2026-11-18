@@ -62,7 +62,10 @@ async function verdicts(page, url) {
   await page.goto(url);
   const defaultHint = await page.locator('#compareHint').textContent();
   assert.match(defaultHint, /十六进制.*Base64 和文件名区分大小写/);
+  await expected(page, `SHA-256: ${checksum('abc')}`);
   await choose(page, 'current.txt');
+  await page.locator('#clearExpected').click();
+  assert.doesNotMatch(await page.locator('#resultsPanel .empty-description').textContent(), /与预期值比对/);
   await expected(page, `SHA256 (other.txt) = ${checksum('abc')}`);
   await compute(page);
   await page.locator('.digest-row').waitFor();

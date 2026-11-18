@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-1zZ8e5EcfAMmWEyjmrESTjO85sJfSlo7CAMe2hzYAPc='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-Ah0jqK1GAt9TJDq8gctGjuZVq2rM3/8Ut0cWSuSI+aY='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -3111,7 +3111,7 @@
       // 按钮的 aria-label 会盖掉内部文字，读屏软件需要在标签里听到文件名。
       dropzone.setAttribute('aria-label', `已选择文件 ${selectedFile.name}，${fileMeta.textContent}。点击更换文件`);
       setStatus(ready ? '文件已就绪，可以开始计算。' : '请至少选择一种算法。', ready ? '' : 'error');
-      renderMessage('文件已就绪', !ready ? '至少选择一种算法后才能计算。' : hasExpectedValue() ? '计算后会立即与预期值比对。' : '点击计算后，所选摘要会显示在这里。');
+      renderMessage('文件已就绪', ready ? '点击计算后，所选摘要会显示在这里。' : '至少选择一种算法后才能计算。');
     }
 
     function fallbackCopy(text) {
