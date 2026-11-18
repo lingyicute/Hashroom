@@ -578,6 +578,10 @@ async function main() {
   assert.deepStrictEqual(parseExpected(`${sha256} ubuntu.iso`).entries.map(entry => entry.file), ['ubuntu.iso']);
   assert.deepStrictEqual(parseExpected(`${sha256}\t./sub/other.iso`).entries.map(entry => entry.file), ['other.iso']);
   assert.deepStrictEqual(parseExpected(`sha256sum ${sha256} dir/win.iso`).entries.map(entry => [entry.algorithm, entry.file]), [['SHA-256', 'win.iso']]);
+  assert.deepStrictEqual(parseExpected(`${sha256} LICENSE`).entries.map(entry => entry.file), ['LICENSE']);
+  assert.deepStrictEqual(parseExpected(`sha256sum ${sha256}\t说明`).entries.map(entry => [entry.algorithm, entry.file]), [['SHA-256', '说明']]);
+  assert.strictEqual(parseExpected(`${sha256} *`).invalid, true); // 不是名为 * 的单空格条目。
+  assert.strictEqual(parseExpected(`SHA-256 ${sha256} / ${sha256}`).invalid, true);
   // 分隔符后是另一段十六进制（分组哈希的后续片段）时不能当成文件名。
   assert.deepStrictEqual(parseExpected(`${sha256.slice(0, 32)} ${sha256.slice(32)}`).entries, [{algorithm: null, hex: sha256, file: ''}]);
   // 超长的行不能拖慢解析（输入框每次改动都会重新解析）。

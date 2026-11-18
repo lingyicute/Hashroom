@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-gjvo1mKuon33Z2rZZkkJP8Qwi7ljCaNe4XZGEkXLnZI='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-2PY1UrkOKR3oT07esyXsFwFmCpV8AYtbW3xT/GMYzCo='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2552,8 +2552,15 @@
       if (escaped) return {invalidFile: true};
       // 表格或手写的清单也可能只用一个空格或制表符分隔；不能把下一组十六进制当作文件名。
       const spaced = payload.match(/^(\S+)[ \t]+(\S[\s\S]*)$/);
-      if (spaced && looksLikeDigest(spaced[1]) && /[./\\]/.test(spaced[2])) {
-        return {tag, content: spaced[1], ...checksumFile(spaced[2])};
+      if (spaced && looksLikeDigest(spaced[1])) {
+        const [, value, name] = spaced;
+        const pathLike = /[./\\]/.test(name) && !/^[./\\]+[ \t]/.test(name);
+        const token = name.trimEnd();
+        // 不猜无结构的多词注释，也不把连续十六进制组解释成文件名。
+        const singleName = /^[^\s*:=]+$/.test(token) && !hexValue(normalizeDigest(token));
+        if (pathLike || (singleName && (tag ? labelledField(tag, normalizeDigest(value)).hex : HASH_LENGTHS.has(hexValue(normalizeDigest(value)).length)))) {
+          return {tag, content: value, ...checksumFile(name)};
+        }
       }
       const prefixFile = text.match(/^([\s\S]+?)[:：][ \t]+([\s\S]+)$/);
       // SHA-512/224、SHA-512/256 的斜杠属于算法名，不是文件路径。
