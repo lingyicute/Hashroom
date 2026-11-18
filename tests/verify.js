@@ -371,7 +371,8 @@ async function main() {
     `SHA-256: ${sha256}.zip`,
     `SHA-256: ${sha256} / ${sha256}`,
     `sha256-${sha256.slice(0, 56)}`,
-    `UNKNOWN256 (file) = ${sha256}`
+    `UNKNOWN256 (file) = ${sha256}`,
+    `SHA256 () = ${sha256}`
   ]) assert.strictEqual(parseExpected(line).invalid, true, line);
   const wrongLength = parseExpected(`SHA-256: ${sha256.slice(0, 56)}`);
   assert.deepStrictEqual(wrongLength.malformed, {algorithm: 'SHA-256', strayLength: 56});
@@ -405,7 +406,10 @@ async function main() {
     `HMAC-SHA256(stdin)= ${sha256}`,
     `Keccak-256: ${sha256}`,
     'MD4 (file.iso) = d41d8cd98f00b204e9800998ecf8427e',
-    'CRC32C: cbf43926'
+    'CRC32C: cbf43926',
+    `SHAKE-128-256: ${sha256}`,
+    `GOST256: ${sha256}`,
+    '12345678 42 ./sample.zip'
   ]) {
     const foreign = parseExpected(line);
     assert.strictEqual(foreign.invalid, true, line);
@@ -438,7 +442,8 @@ async function main() {
   const mixed = parseExpected(`SHA256 hash of file.iso:\n${sha256}\nCertUtil: -hashfile command completed successfully.`);
   assert.deepStrictEqual(mixed.entries, [{algorithm: 'SHA-256', hex: sha256, file: 'file.iso', path: 'file.iso'}]);
   assert.strictEqual(mixed.invalidLines, 0);
-  const windows = parseExpected(`SHA256       ${sha256}       C:\\Downloads\\test.iso`);
+  const windows = parseExpected(`Algorithm   Hash   Path\n---------   ----   ----\nSHA256       ${sha256}       C:\\Downloads\\test.iso`);
+  assert.strictEqual(windows.invalidLines, 0);
   assert.deepStrictEqual(windows.entries.map(({algorithm, file}) => [algorithm, file]), [['SHA-256', 'test.iso']]);
   // 整份校验清单：只比对写明了当前文件名的那一行，其他文件的行不参与。
   const list = parseExpected([

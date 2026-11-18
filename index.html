@@ -2380,7 +2380,7 @@
     const MAX_NAMES_PER_LINE = 8;
 
     const NAME_PATTERN = /sha[-_]?(?:2[-_]?)?512[/_t-]?(?:224|256)|sha[-_]?[23][-_]?(?:224|256|384|512)|sha[-_]?(?:224|256|384|512|1)|ripemd[-_]?160|rmd[-_]?160|crc[-_]?32|md[-_]?5/gi;
-    const UNSUPPORTED_PATTERN = /blake[-_]?[23][a-z]*(?:[-_]?[0-9]+)?|b[23]sum|sm-?3|shake-?(?:128|256)|keccak[-_]?(?:224|256|384|512)|hmac(?:[-_]?(?:sha[-_]?(?:[23][-_]?)?(?:512(?:[/_t-]?(?:224|256))?|224|256|384|1)|md[-_]?[245]|ripemd[-_]?160|sm-?3))?|md-?[24]|ripemd-?(?:128|256|320)|whirlpool|streebog(?:-?[0-9]+)?|skein(?:-?[0-9]+)?|xxh(?:ash)?(?:[-_]?[0-9]+)*(?:bits?)?|adler-?32|crc-?32c/gi;
+    const UNSUPPORTED_PATTERN = /blake[-_]?[23][a-z]*(?:[-_]?[0-9]+)?|b[23]sum|sm[-_]?3|(?:c?shake|kmac)[-_]?(?:128|256)(?:[-_]?[0-9]+)?|keccak[-_]?(?:224|256|384|512)|hmac(?:[-_]?(?:sha[-_]?(?:[23][-_]?)?(?:512(?:[/_t-]?(?:224|256))?|224|256|384|1)|md[-_]?[245]|ripemd[-_]?160|sm-?3))?|md[-_]?[24]|ripemd[-_]?(?:128|256|320)|whirlpool|streebog(?:-?[0-9]+)?|skein(?:-?[0-9]+)?|xxh(?:ash)?(?:[-_]?[0-9]+)*(?:bits?)?|adler[-_]?32|crc[-_]?32c|posix cksum/gi;
 
     // 只在标签内查找算法名，从不把摘要或文件名里的片段当成算法提示。
     function findAlgorithmNames(label, pattern = NAME_PATTERN) {
@@ -2437,14 +2437,14 @@
     }
 
     function labelledField(label, value, tagged = false) {
-      const names = [...new Set(findAlgorithmNames(label.replace(/^--/, '')).map(canonicalAlgorithm))];
+      label = label.replace(/^--/, '');
+      const names = [...new Set(findAlgorithmNames(label).map(canonicalAlgorithm))];
       const foreign = findAlgorithmNames(label, UNSUPPORTED_PATTERN).find(name => !names.length || /^hmac/i.test(name));
       if (foreign) return {unsupported: foreign};
       if (names.length > 1) return {};
       const result = digestField(value, names[0]);
-      if (!names.length && (tagged || /^(?:sha|md|crc)[-_]?\d[\w/-]*$/i.test(label))) {
-        return result.hex ? {unsupported: label} : {};
-      }
+      const neutral = /^(?:(?:hash|digest|checksum)(?: value)?|(?:哈希|散列|摘要)(?:值)?|校验[和值])$/i.test(label);
+      if (!names.length && (tagged || !neutral)) return result.hex ? {unsupported: label.slice(0, 80)} : {};
       return result;
     }
 
@@ -2513,8 +2513,11 @@
     function splitChecksumLine(line) {
       const escaped = line.startsWith('\\');
       const text = escaped ? line.slice(1) : line;
-      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\((.+)\)\s*=\s*(.*)$/);
+      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\((.*)\)\s*=\s*(.*)$/);
       if (bsd) return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
+      // POSIX cksum 输出十进制校验和和文件大小，用的并不是这里的 CRC32。
+      const posix = !escaped && text.match(/^(\d{1,10}) \d+ (.+)$/);
+      if (posix && !hexValue(text)) return {tag: 'POSIX cksum', content: posix[1], ...checksumFile(posix[2])};
       const grouped = text.match(/^([0-9a-fx:：,，_\t \-]+)[ \t]{2,}(\S.*)$/i);
       if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2])) {
         const hex = hexValue(grouped[1]);
@@ -2576,6 +2579,10 @@
         for (let i = 0; i < rows.length; i += 1) {
           const line = rows[i].replace(/^[\s\u200b-\u200d\u2060]+/, '');
           if (!line || /^(?:#|;|\/\/)/.test(line) || /^CertUtil: -hashfile command completed successfully\.\s*$/i.test(line)) continue;
+          if (/^Algorithm\s+Hash\s+Path\s*$/i.test(line) && /^-+\s+-+\s+-+\s*$/.test(rows[i + 1] || '')) {
+            i += 1;
+            continue;
+          }
           if (rows[i].length > MAX_LINE_LENGTH) {
             invalidLines += 1;
             continue;
@@ -2791,6 +2798,10 @@
         const title = matched.size ? `已匹配 ${describeCandidates([...matched])}` :
           pending.size ? (currentResults.length ? '尚未匹配，仍有算法未计算' : '等待计算结果') : '无法完成比对';
         renderBanner('info', title, details.join(''));
+        return;
+      }
+      if (parsed.partialInvalid) {
+        renderBanner('info', `已匹配 ${describeCandidates([...matched])}`, '仅比对了可识别的摘要，部分校验行未参与。');
         return;
       }
       renderBanner('match', `与 ${describeCandidates([...matched])} 一致`, '所列算法的摘要与可用预期值一致。');
