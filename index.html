@@ -593,6 +593,16 @@
       height: 18px;
     }
 
+    .file-notice:not(:empty) {
+      margin: 8px 2px 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .file-notice.is-error:not(:empty) {
+      color: var(--error);
+    }
+
     .visually-hidden {
       position: absolute;
       width: 1px;
@@ -1355,6 +1365,7 @@
             </svg>
           </button>
         </div>
+        <p class="file-notice" id="fileNotice" role="status" aria-live="polite" aria-atomic="true"></p>
 
         <section class="panel" aria-labelledby="algorithmTitle">
           <div class="section-head">
@@ -1469,6 +1480,7 @@
     const selectedFileState = document.getElementById('selectedFileState');
     const fileName = document.getElementById('fileName');
     const fileMeta = document.getElementById('fileMeta');
+    const fileNotice = document.getElementById('fileNotice');
     const clearFileButton = document.getElementById('clearFile');
     const algorithmMount = document.getElementById('algorithmMount');
     const algorithmCount = document.getElementById('algorithmCount');
@@ -2947,6 +2959,7 @@
       stopCalculation();
       selectedFile = file || null;
       fileInput.value = '';
+      setFileNotice('');
       clearResults();
       updateComparison();
       updateComputeButton();
@@ -3488,51 +3501,63 @@
       if (event.target.files && event.target.files.length) setSelectedFile(event.target.files[0]);
     });
     ['dragenter', 'dragover'].forEach(type => dropzone.addEventListener(type, event => {
-      if (!hasFiles(event)) return;
+      if (!hasFiles(event.dataTransfer)) return;
       event.preventDefault();
       dropzone.classList.add('is-dragging');
     }));
     dropzone.addEventListener('dragleave', event => {
       if (!dropzone.contains(event.relatedTarget)) dropzone.classList.remove('is-dragging');
     });
-    dropzone.addEventListener('drop', event => {
-      if (!hasFiles(event)) return;
-      event.preventDefault();
-      dropzone.classList.remove('is-dragging');
-      acceptDrop(event);
-    });
-    function acceptDrop(event) {
-      const transfer = event.dataTransfer;
-      if (!transfer || !transfer.files.length) return;
-      const item = transfer.items && [...transfer.items].find(entry => entry.kind === 'file');
-      const entry = item && typeof item.webkitGetAsEntry === 'function' ? item.webkitGetAsEntry() : null;
-      if (entry && entry.isDirectory) {
-        setStatus('不支持文件夹，请拖入单个文件。', 'error');
-        return;
-      }
-      setSelectedFile(transfer.files[0]);
-      if (transfer.files.length > 1 && selectedAlgorithms().length) {
-        setStatus(`一次只能计算一个文件，已选择第一个，忽略其余 ${transfer.files.length - 1} 个。`);
-      }
+    function setFileNotice(message, error = false) {
+      fileNotice.classList.toggle('is-error', error);
+      fileNotice.textContent = message;
     }
 
-    function hasFiles(event) {
-      const transfer = event.dataTransfer;
-      if (!transfer) return false;
-      // 个别浏览器（以及部分 WebView）在 drop 时 types 可能不含 'Files'，但 files 里已经有文件；
-      // 只认 types 会让这次拖放不被接管，浏览器直接打开文件、页面状态全部丢失。
-      return Boolean((transfer.files && transfer.files.length) || Array.from(transfer.types || []).includes('Files'));
+    function transferItems(transfer) {
+      return Array.from(transfer.items || []).filter(item => item.kind === 'file');
+    }
+
+    function acceptDrop(transfer) {
+      const files = transfer.files || [];
+      const items = transferItems(transfer);
+      const first = items[0];
+      const getEntry = first && (first.getAsEntry || first.webkitGetAsEntry);
+      let entry;
+      if (typeof getEntry === 'function') {
+        try { entry = getEntry.call(first); } catch (error) { /* 改用 FileList */ }
+      }
+      if (entry && entry.isDirectory) {
+        setFileNotice('不支持文件夹，请拖入单个文件。', true);
+        return;
+      }
+      const fromItem = first && typeof first.getAsFile === 'function' ? first.getAsFile() : null;
+      const file = fromItem || files[0];
+      if (!file) {
+        setFileNotice('未读取到文件，请选择单个文件。', true);
+        return;
+      }
+      setSelectedFile(file);
+      const count = Math.max(files.length, items.length);
+      if (count > 1) setFileNotice(`一次只能计算一个文件，已选择第一个，忽略其余 ${count - 1} 项。`);
+    }
+
+    function hasFiles(transfer) {
+      // 有的浏览器在拖放时只填充 types、FileList 或 DataTransferItemList 之一。
+      return Boolean(transfer && ((transfer.files && transfer.files.length) ||
+        Array.from(transfer.types || []).includes('Files') || transferItems(transfer).length));
     }
     window.addEventListener('dragover', event => {
-      if (hasFiles(event)) event.preventDefault();
+      if (!hasFiles(event.dataTransfer)) return;
+      event.preventDefault();
+      event.dataTransfer.dropEffect = 'copy';
     });
     window.addEventListener('drop', event => {
-      // 拖放区自己的处理函数已经调用过 preventDefault，这里只接管落在页面其他位置的文件。
-      if (!hasFiles(event) || event.defaultPrevented) return;
-      event.preventDefault();
       dropzone.classList.remove('is-dragging');
-      acceptDrop(event);
+      if (!hasFiles(event.dataTransfer)) return;
+      event.preventDefault();
+      acceptDrop(event.dataTransfer);
     });
+    window.addEventListener('dragend', () => dropzone.classList.remove('is-dragging'));
     clearFileButton.addEventListener('click', () => {
       setSelectedFile(null);
       // 清除按钮随即隐藏，把焦点交给选择区域，键盘用户不会丢失位置。
