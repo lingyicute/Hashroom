@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-HvsmiRH05YTdbOLlQVggPwzvNU8m5OgIrhSZd2hvdxg='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-AeeBBKAP3nSov1/5QMBU4eWDHxWtnyempimdwa+zsiM='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -3110,6 +3110,15 @@
       const active = document.activeElement;
       const selection = active && typeof active.selectionStart === 'number' ?
         [active.selectionStart, active.selectionEnd, active.selectionDirection] : null;
+      const pageSelection = selection ? null : document.getSelection();
+      const ranges = [];
+      let endpoints;
+      if (pageSelection) {
+        for (let i = 0; i < pageSelection.rangeCount; i += 1) ranges.push(pageSelection.getRangeAt(i).cloneRange());
+        if (ranges.length === 1) {
+          endpoints = [pageSelection.anchorNode, pageSelection.anchorOffset, pageSelection.focusNode, pageSelection.focusOffset];
+        }
+      }
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.setAttribute('readonly', '');
@@ -3130,6 +3139,11 @@
         if (active && active.isConnected && typeof active.focus === 'function') {
           active.focus({preventScroll: true});
           if (selection) active.setSelectionRange(...selection);
+        }
+        if (pageSelection) {
+          pageSelection.removeAllRanges();
+          if (endpoints && typeof pageSelection.setBaseAndExtent === 'function') pageSelection.setBaseAndExtent(...endpoints);
+          else ranges.forEach(range => pageSelection.addRange(range));
         }
       }
     }

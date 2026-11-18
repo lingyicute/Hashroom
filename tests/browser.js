@@ -138,6 +138,16 @@ async function clipboard(page, url) {
   assert.equal(await page.evaluate(() => document.activeElement.id), 'copyAllButton');
   assert.equal(await page.locator('#statusLine').textContent(), status);
   await page.evaluate(() => {
+    const value = document.querySelector('.digest-value').firstChild;
+    window.getSelection().setBaseAndExtent(value, value.length, value, 0);
+    document.getElementById('copyAllButton').click();
+  });
+  await page.locator('#copyStatus.is-error').waitFor();
+  assert.deepEqual(await page.evaluate(() => {
+    const selection = window.getSelection();
+    return [selection.toString(), selection.anchorOffset > selection.focusOffset];
+  }), [checksum('abc'), true]);
+  await page.evaluate(() => {
     navigator.clipboard.writeText = () => new Promise(resolve => { window.finishCopy = resolve; });
   });
   await button.click();
