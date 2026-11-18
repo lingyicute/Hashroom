@@ -634,7 +634,5 @@ async function main() {
   console.log('ok    parseExpected');
 }
 
-main().catch(error => {
-  console.error(error);
-  process.exit(1);
-});
+// 测试运行器会把始终未完成的 Promise 计为失败，而不是让空闲事件循环正常退出。
+require('node:test').test('Hashroom 回归', {timeout: 60000}, main);
