@@ -1042,7 +1042,8 @@
       background: color-mix(in srgb, var(--success-container) 72%, var(--surface));
     }
 
-    .digest-row.is-mismatch {
+    .digest-row.is-mismatch,
+    .digest-row.is-conflict {
       background: var(--error-container);
       background: color-mix(in srgb, var(--error-container) 76%, var(--surface));
     }
@@ -1082,7 +1083,8 @@
       color: var(--on-success-container);
     }
 
-    .match-pill.is-mismatch {
+    .match-pill.is-mismatch,
+    .match-pill.is-conflict {
       background: var(--error-container);
       color: var(--on-error-container);
     }
@@ -1486,8 +1488,10 @@
     let algorithmInputs = [];
     let selectedFile = null;
     let currentResults = [];
-    let expectedEntries = [];
-    let expectedInvalid = false;
+    let parsedInput;
+    let parsedExpected;
+    let comparison;
+    let currentVerdict = null;
     let isCalculating = false;
     let runToken = 0;
     let lastElapsed = '';
@@ -2248,13 +2252,6 @@
       return hasher.digest();
     }
 
-    function hexEqual(left, right) {
-      if (left.length !== right.length) return false;
-      let diff = 0;
-      for (let i = 0; i < left.length; i += 1) diff |= left.charCodeAt(i) ^ right.charCodeAt(i);
-      return diff === 0;
-    }
-
     function firstDifference(left, right) {
       const length = Math.min(left.length, right.length);
       for (let i = 0; i < length; i += 1) if (left[i] !== right[i]) return i + 1;
@@ -2527,37 +2524,59 @@
         invalidLines, unsupportedLines, strayLength, malformed, tooLarge, unsupported: [...unsupported.values()]};
     }
 
-    function entryTargets(entry, algorithm, hex) {
-      if (entry.algorithm) return entry.algorithm === algorithm;
-      return entry.hex.length === hex.length;
-    }
-
-    function rowComparison(result) {
-      let verdict = null;
-      for (const entry of expectedEntries) {
-        if (!entryTargets(entry, result.algorithm, result.hex)) continue;
-        if (hexEqual(entry.hex, result.hex)) return 'match';
-        // 未标注算法的预期值只要被同长度的另一种算法命中，这一行就不算不一致。
-        if (!entry.algorithm && currentResults.some(other => other !== result && other.hex.length === entry.hex.length && hexEqual(other.hex, entry.hex))) continue;
-        verdict = 'mismatch';
+    function compareDigests(entries, results, enabled) {
+      const byId = new Map(results.map(result => [result.algorithm, result.hex]));
+      const groups = new Map();
+      for (const entry of entries) {
+        // 单文件清单的具名算法不能有互相冲突的校验值；无文件名的同组摘要允许作为备选（如 SRI）。
+        const key = entry.file ? (entry.algorithm ? `file:${entry.algorithm}:${entry.path}` : `value:${entry.hex}`) :
+          (entry.algorithm || `length:${entry.hex.length}`);
+        if (!groups.has(key)) groups.set(key, {entry, values: new Set()});
+        groups.get(key).values.add(entry.hex);
       }
-      return verdict;
-    }
-
-    function candidateAlgorithms() {
-      const ids = new Set();
-      expectedEntries.forEach(entry => {
-        if (entry.algorithm) ids.add(entry.algorithm);
-        // 未标注算法的预期值一旦被某个结果命中，就不必再建议同长度的其他算法。
-        else if (!currentResults.some(result => hexEqual(result.hex, entry.hex))) algorithmsForLength(entry.hex.length).forEach(item => ids.add(item.id));
-      });
-      return [...ids];
+      const summary = {hasEntries: entries.length > 0, rows: new Map(), matched: new Set(), mismatched: new Set(),
+        needed: new Set(), pending: new Set(), unavailable: new Set(), conflicts: new Set(), firstMismatch: null};
+      const priority = {match: 1, mismatch: 2, conflict: 3};
+      const mark = (id, kind) => {
+        if (byId.has(id) && (priority[summary.rows.get(id)] || 0) < priority[kind]) summary.rows.set(id, kind);
+      };
+      for (const {entry, values} of groups.values()) {
+        const {algorithm, hex, file} = entry;
+        const ids = algorithm ? [algorithm] : algorithmsForLength(hex.length).map(item => item.id);
+        if (algorithm && file && values.size > 1) {
+          summary.conflicts.add(algorithm);
+          mark(algorithm, 'conflict');
+          continue;
+        }
+        const hits = ids.filter(id => values.has(byId.get(id)));
+        if (hits.length) {
+          hits.forEach(id => {
+            summary.matched.add(id);
+            mark(id, 'match');
+          });
+          continue;
+        }
+        const remaining = ids.filter(id => !byId.has(id) && enabled.has(id));
+        if (remaining.length) {
+          summary.pending.add(algorithm || `${hex.length} 位哈希`);
+          remaining.forEach(id => summary.needed.add(id));
+          continue;
+        }
+        const disabled = ids.filter(id => !byId.has(id));
+        if (disabled.length) {
+          disabled.forEach(id => summary.unavailable.add(id));
+          continue;
+        }
+        summary.mismatched.add(ids.join(' / '));
+        ids.forEach(id => mark(id, 'mismatch'));
+        if (!summary.firstMismatch) summary.firstMismatch = {expected: hex, actual: byId.get(ids[0]), ids};
+      }
+      return summary;
     }
 
     function missingCandidates() {
       const selected = new Set(selectedAlgorithms());
-      const disabled = new Set(algorithmInputs.filter(input => input.disabled).map(input => input.value));
-      return candidateAlgorithms().filter(id => !selected.has(id) && !disabled.has(id));
+      return [...comparison.needed].filter(id => !selected.has(id));
     }
 
     function describeCandidates(ids) {
@@ -2571,6 +2590,7 @@
     }
 
     function renderBanner(kind, title, detail) {
+      currentVerdict = {kind, title};
       compareBanner.hidden = false;
       compareBanner.className = `compare-banner is-${kind}`;
       replaceChildren(compareBanner);
@@ -2589,10 +2609,17 @@
     }
 
     function updateComparison() {
-      const parsed = parseExpected(expectedInput.value);
+      const input = expectedInput.value;
+      if (input !== parsedInput) {
+        parsedInput = input;
+        parsedExpected = parseExpected(input);
+      }
+      const parsed = parsedExpected;
       const scoped = entriesForFile(parsed.entries, selectedFile && selectedFile.name, parsed.files);
-      expectedEntries = scoped.entries;
-      expectedInvalid = parsed.invalid || Boolean(scoped.issue);
+      const expectedEntries = scoped.entries;
+      const enabled = new Set(algorithmInputs.filter(input => !input.disabled).map(input => input.value));
+      comparison = compareDigests(expectedEntries, currentResults, enabled);
+      currentVerdict = null;
       const scopeMessage = {
         missing: '清单里没有当前文件的名字',
         ambiguous: '清单中有多个路径指向同名文件，无法区分',
@@ -2662,60 +2689,27 @@
       if (scoped.ignored) hint += `。已忽略 ${scoped.ignored} 条无法归属当前文件的校验值`;
       compareHint.textContent = `${hint}。`;
 
-      if (!currentResults.length) {
-        renderBanner('info', '等待计算结果', missing.length ? `还需要计算 ${describeCandidates(missing)}。` : '计算完成后会自动比对。');
+      const {matched, mismatched, pending, unavailable, conflicts, firstMismatch} = comparison;
+      if (conflicts.size) {
+        renderBanner('mismatch', '校验清单有冲突', `${describeCandidates([...conflicts])} 对同一个文件给出了不同的摘要，请核对来源。`);
         return;
       }
-
-      const matched = [];
-      const mismatched = [];
-      const pending = [];
-      // 与每一行的判定保持一致：某个结果只要被任意一条预期值命中就算一致，同一算法其余没命中的条目
-      // （如文件被浏览器改名后，整份清单里其他文件的行）不再让横幅和状态栏报“不一致”。
-      const verdicts = new Map(currentResults.map(result => [result, rowComparison(result)]));
-      const unmatchedTargets = entry => {
-        const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
-        if (targets.some(result => hexEqual(result.hex, entry.hex))) return [];
-        return targets.filter(result => verdicts.get(result) === 'mismatch');
-      };
-      expectedEntries.forEach(entry => {
-        const targets = currentResults.filter(result => entryTargets(entry, result.algorithm, result.hex));
-        if (!targets.length) {
-          const label = entry.algorithm || `${entry.hex.length} 位哈希`;
-          if (!pending.includes(label)) pending.push(label);
-          return;
-        }
-        const hit = targets.find(result => hexEqual(result.hex, entry.hex));
-        if (hit) {
-          if (!matched.includes(hit.algorithm)) matched.push(hit.algorithm);
-          return;
-        }
-        const missed = unmatchedTargets(entry);
-        const mismatchLabel = entry.algorithm || missed.map(result => result.algorithm).join(' / ');
-        if (missed.length && !mismatched.includes(mismatchLabel)) mismatched.push(mismatchLabel);
-      });
-
-      if (mismatched.length) {
-        const first = expectedEntries.find(entry => unmatchedTargets(entry).length);
-        const target = unmatchedTargets(first).find(result => result.hex.length === first.hex.length);
-        // 横幅开头已经点名了这一条没匹配的算法（预期值写明了算法，或只有一个候选算法）时，
-        // 不必再重复“与 SHA-256”；只有开头列的是“A / B”这类多个候选时，才需要说明比的是哪一个。
-        const firstMissed = target ? unmatchedTargets(first) : [];
-        const covered = target && (first.algorithm === target.algorithm || (!first.algorithm && firstMissed.length === 1));
-        const compared = target && !covered ? `与 ${target.algorithm} ` : '';
-        const where = target ? `，${compared}从第 ${firstDifference(first.hex, target.hex)} 位开始不同` : '';
-        renderBanner('mismatch', '校验值不一致', `${mismatched.join('、')} 没有匹配${where}。`);
+      if (mismatched.size) {
+        const {expected, actual, ids} = firstMismatch;
+        const compared = ids.length > 1 ? `与 ${ids[0]} ` : '';
+        renderBanner('mismatch', '校验值不一致', `${describeCandidates([...mismatched])} 没有匹配，${compared}从第 ${firstDifference(expected, actual)} 位开始不同。`);
         return;
       }
-      if (pending.length && !matched.length) {
-        renderBanner('info', '还没有可比对的结果', `请计算 ${describeCandidates(missing.length ? missing : pending)}。`);
+      if (pending.size || unavailable.size) {
+        const details = [];
+        if (pending.size) details.push(`还需比对 ${describeCandidates([...pending])}${missing.length ? `，可补选 ${describeCandidates(missing)}` : ''}。`);
+        if (unavailable.size) details.push(`${describeCandidates([...unavailable])} 已停用，无法完成这些比对。`);
+        const title = matched.size ? `已匹配 ${describeCandidates([...matched])}` :
+          pending.size ? (currentResults.length ? '尚未匹配，仍有算法未计算' : '等待计算结果') : '无法完成比对';
+        renderBanner('info', title, details.join(''));
         return;
       }
-      if (pending.length) {
-        renderBanner('info', `已匹配 ${matched.join('、')}`, `仍有预期值尚未计算：${pending.join('、')}。`);
-        return;
-      }
-      renderBanner('match', `与 ${matched.join('、')} 一致`, '预期值与本次计算结果完全相同。');
+      renderBanner('match', `与 ${describeCandidates([...matched])} 一致`, '所列算法的摘要与可用预期值一致。');
     }
 
     function selectedAlgorithms() {
@@ -2770,7 +2764,7 @@
     }
 
     function hasExpectedValue() {
-      return expectedEntries.length > 0;
+      return comparison.hasEntries;
     }
 
     function updateComputeButton() {
@@ -2835,12 +2829,26 @@
       detail.textContent = description;
     }
 
-    function createDigestRow(result, index, animate) {
-      const comparison = rowComparison(result);
+    function refreshDigestRow(row, result) {
+      const kind = comparison.rows.get(result.algorithm);
+      for (const name of ['match', 'mismatch', 'conflict']) row.classList.toggle(`is-${name}`, kind === name);
+      let pill = row.querySelector('.match-pill');
+      if (!kind) {
+        if (pill) pill.remove();
+        return;
+      }
+      if (!pill) {
+        pill = document.createElement('span');
+        row.querySelector('.digest-meta').append(pill);
+      }
+      pill.className = `match-pill is-${kind}`;
+      pill.textContent = {match: '一致', mismatch: '不一致', conflict: '清单冲突'}[kind];
+    }
+
+    function createDigestRow(result, index) {
       const row = document.createElement('article');
-      row.className = `digest-row${comparison ? ` is-${comparison}` : ''}`;
-      if (animate) row.style.animationDelay = `${index * 40}ms`;
-      else row.style.animation = 'none';
+      row.className = 'digest-row';
+      row.style.animationDelay = `${index * 40}ms`;
       const content = document.createElement('div');
       const meta = document.createElement('div');
       meta.className = 'digest-meta';
@@ -2851,12 +2859,6 @@
       length.className = 'digest-length';
       length.textContent = `${result.hex.length} 个十六进制字符`;
       meta.append(algorithm, length);
-      if (comparison) {
-        const pill = document.createElement('span');
-        pill.className = `match-pill is-${comparison}`;
-        pill.textContent = comparison === 'match' ? '一致' : '不一致';
-        meta.append(pill);
-      }
       const value = document.createElement('code');
       value.className = 'digest-value';
       value.textContent = result.hex;
@@ -2872,14 +2874,14 @@
       button.append(icon);
       button.addEventListener('click', () => copyText(`${result.algorithm}: ${result.hex}`, button, `已复制 ${result.algorithm}`));
       row.append(content, button);
+      refreshDigestRow(row, result);
       return row;
     }
 
-    function renderResults(results, animate = true) {
-      currentResults = results;
-      copyAllButton.disabled = !results.length;
+    function renderResults() {
+      copyAllButton.disabled = !currentResults.length;
       resultsPanel.className = 'results-panel';
-      replaceChildren(resultsPanel, ...results.map((result, index) => createDigestRow(result, index, animate)));
+      replaceChildren(resultsPanel, ...currentResults.map(createDigestRow));
       resultsPanel.setAttribute('aria-busy', 'false');
     }
 
@@ -3137,11 +3139,10 @@
 
     // 结果已经显示时，状态栏跟随最新的比对结论，不留下过时的信息。
     function reportOutcome() {
-      const verdict = compareBanner.querySelector('strong');
       const elapsed = lastElapsed ? `，用时 ${lastElapsed}` : '';
-      if ((hasExpectedValue() || expectedInvalid) && verdict && !compareBanner.hidden) {
-        const isError = compareBanner.classList.contains('is-mismatch') || compareBanner.classList.contains('is-invalid');
-        setStatus(`${verdict.textContent}${elapsed}`, compareBanner.classList.contains('is-match') ? 'match' : isError ? 'error' : '');
+      if (currentVerdict) {
+        const {kind, title} = currentVerdict;
+        setStatus(`${title}${elapsed}`, kind === 'match' ? 'match' : kind === 'mismatch' || kind === 'invalid' ? 'error' : '');
       } else {
         setStatus(`已完成 ${currentResults.length} 种摘要计算${elapsed}。`, 'match');
       }
@@ -3190,9 +3191,10 @@
           showProgress(name ? `当前算法 ${name}` : '文件正在分块处理。', progress);
         });
         if (!results || token !== runToken) return;
-        renderResults(results);
+        currentResults = results;
         lastElapsed = formatDuration(performance.now() - started);
         updateComparison();
+        renderResults();
         reportOutcome();
         // 偏好减少动态效果时直接跳到结果，而不是干脆不滚动：小屏幕上结果可能在视口之外。
         const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -3333,9 +3335,9 @@
         if (fallback) fallback.checked = true;
       }
       refreshAlgorithmStyles();
-      updateComputeButton();
       // 停用后重新算一遍可补选的算法，别再建议已经停用的那几个。
       updateComparison();
+      updateComputeButton();
       const names = ids.join('、');
       setStatus(`算法自检未通过：${names}，已暂停使用。`, 'error');
       renderMessage('算法自检未通过', `${names} 的计算结果与标准测试向量不一致，已暂停这些算法，其他算法不受影响。`, 'error');
@@ -3479,26 +3481,22 @@
       setCheckedAlgorithms(ALGORITHMS.filter(item => item.group === 'common').map(item => item.id), true);
     });
     document.getElementById('selectAll').addEventListener('click', () => setCheckedAlgorithms(ALGORITHMS.map(item => item.id), true));
-    expectedInput.addEventListener('input', () => {
+    function onExpectedChanged() {
       updateComparison();
       updateComputeButton();
       if (currentResults.length) {
-        renderResults(currentResults, false);
+        currentResults.forEach((result, index) => refreshDigestRow(resultsPanel.children[index], result));
         reportOutcome();
       }
-    });
+    }
+    expectedInput.addEventListener('input', onExpectedChanged);
     clearExpected.addEventListener('click', () => {
       expectedInput.value = '';
-      updateComparison();
-      updateComputeButton();
-      if (currentResults.length) {
-        renderResults(currentResults, false);
-        reportOutcome();
-      }
+      onExpectedChanged();
       expectedInput.focus();
     });
     applySuggested.addEventListener('click', () => {
-      setCheckedAlgorithms(candidateAlgorithms(), false);
+      setCheckedAlgorithms(missingCandidates(), false);
       // 补选后按钮随即隐藏，把焦点交给下一步操作的控件。
       (computeButton.disabled ? dropzone : computeButton).focus();
     });

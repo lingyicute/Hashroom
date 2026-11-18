@@ -22,14 +22,14 @@ const code = [
   'let runToken = 1; const window = globalThis;',
   // 让出线程的辅助函数在 Node 里会让 MessagePort 挂住事件循环，测试中走 setTimeout 的退路。
   'const MessageChannel = undefined;',
-  cut('function rotl32', 'function hexEqual'),
+  cut('function rotl32', 'function firstDifference'),
   'globalThis.__writeBitLength = writeBitLength;',
-  cut('function canonicalAlgorithm', 'function entryTargets'),
+  cut('function canonicalAlgorithm', 'function missingCandidates'),
   cut('const yieldQueue', 'async function computeHashes'),
-  'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile};'
+  'return {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile, compareDigests};'
 ].join('\n');
 
-const {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile} =
+const {ALGORITHMS, createHasher, digestBytes, hashFile, parseExpected, entriesForFile, compareDigests} =
   new Function('crypto', 'performance', code)(crypto.webcrypto, performance);
 
 const NODE_NAMES = {
@@ -91,10 +91,46 @@ function checkSelfTestVectors() {
   console.log('ok    self-test vectors', vectors.length);
 }
 
+function checkComparison() {
+  const enabled = new Set(ALGORITHMS.map(item => item.id));
+  const sha256 = {algorithm: 'SHA-256', hex: expected('SHA-256', Buffer.from('abc'))};
+  const sha3 = {algorithm: 'SHA3-256', hex: expected('SHA3-256', Buffer.from('abc'))};
+  const sha512t = {algorithm: 'SHA-512/256', hex: expected('SHA-512/256', Buffer.from('abc'))};
+  const wrong = '1'.repeat(64);
+  const check = (text, results, supported = enabled) => compareDigests(parseExpected(text).entries, results, supported);
+  const pending = check(sha3.hex, [sha256]);
+  assert.deepStrictEqual([...pending.needed], ['SHA-512/256', 'SHA3-256']);
+  assert.strictEqual(pending.mismatched.size, 0);
+  assert.strictEqual(pending.rows.size, 0);
+  const match = check(sha3.hex, [sha256, sha3]);
+  assert.deepStrictEqual([...match.rows], [['SHA3-256', 'match']]);
+  assert.strictEqual(match.needed.size, 0);
+  const miss = check(wrong, [sha256, sha3, sha512t]);
+  assert.strictEqual(miss.mismatched.size, 1);
+  assert.strictEqual(miss.rows.size, 3);
+  const scoped = check(`SHA-256 (file) = ${wrong}\n${sha256.hex}`, [sha256]);
+  assert.strictEqual(scoped.rows.get('SHA-256'), 'mismatch');
+  const conflict = check(`SHA-256 (file) = ${wrong}\nSHA-256 (file) = ${sha256.hex}`, [sha256]);
+  assert.deepStrictEqual([...conflict.conflicts], ['SHA-256']);
+  assert.deepStrictEqual([...conflict.rows], [['SHA-256', 'conflict']]);
+  const differentFiles = check(`SHA-256 (a/file) = ${wrong}\nSHA-256 (b/file) = ${sha256.hex}`, []);
+  assert.strictEqual(differentFiles.conflicts.size, 0);
+  const alternatives = check(`SHA-256: ${wrong}\nSHA-256: ${sha256.hex}`, [sha256]);
+  assert.deepStrictEqual([...alternatives.rows], [['SHA-256', 'match']]);
+  const disabled = check(sha3.hex, [sha256], new Set(['SHA-256']));
+  assert.deepStrictEqual([...disabled.unavailable], ['SHA-512/256', 'SHA3-256']);
+  assert.strictEqual(disabled.mismatched.size, 0);
+  const independent = check(`${sha256.hex}  file\n${sha3.hex}  file`, [sha256]);
+  assert.strictEqual(independent.matched.size, 1);
+  assert.strictEqual(independent.pending.size, 1);
+  console.log('ok    comparison decisions');
+}
+
 async function main() {
   checkBitLength();
   checkDurationFormat();
   checkSelfTestVectors();
+  checkComparison();
   const hasCrc = typeof require('zlib').crc32 === 'function';
   const sizes = [];
   for (let i = 0; i <= 300; i += 1) sizes.push(i);
