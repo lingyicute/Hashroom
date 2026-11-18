@@ -62,6 +62,16 @@ npm test    # 等价于 node tests/verify.js
 
 修改 `index.html` 中的脚本后，先运行 `node tests/check-csp.js --write` 更新 CSP 白名单；`npm test` 会检查其是否与脚本一致。
 
+浏览器交互回归可选用 Playwright；以下命令不改变项目依赖：
+
+```sh
+npm install --no-save --package-lock=false playwright
+npx playwright install chromium
+node tests/browser.js
+```
+
+安装相应浏览器后，可用 `HASHROOM_BROWSER=firefox` 或 `HASHROOM_BROWSER=webkit` 运行同一套测试。脚本会临时启动回环 HTTP 服务，并验证直接打开本地文件的路径。
+
 ## 许可
 
 [AGPL-3.0](LICENSE)
