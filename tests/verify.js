@@ -358,6 +358,10 @@ async function main() {
   const invalidNative = loadHashroom({digest: async () => 32});
   assert.deepStrictEqual(await invalidNative.hashFile(new Blob(['abc']), ['SHA-256'], freshSignal(), () => {}),
     [{algorithm: 'SHA-256', hex: expected('SHA-256', Buffer.from('abc'))}]);
+  for (const size of [-1, 0.5, Infinity, NaN, Number.MAX_SAFE_INTEGER + 1]) {
+    const invalidFile = {size, arrayBuffer() { assert.fail('无效大小不应触发读取'); }};
+    await assert.rejects(hashFile(invalidFile, ['SHA-256'], freshSignal(), () => {}), /Invalid file size/);
+  }
   console.log('ok    hashFile');
   await checkCancellation();
   await checkLargeStream();

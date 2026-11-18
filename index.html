@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-Buf/1s5UeRG3UGRTaUaMZ94WJhCevfDL5/X3gSQ9+Wo='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-hJRbf5wwtYzHJzIwBG75r+VGLUmHjYrxPKCO8zkt+gc='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -3280,29 +3280,29 @@
       return signal.aborted ? null : results;
     }
 
-    async function hashStreamed(file, ids, signal, onProgress) {
+    async function hashStreamed(file, size, ids, signal, onProgress) {
       const hashers = ids.map(id => ({id, hasher: createHasher(id)}));
       const readSlice = offset => {
-        const pending = readBlob(file.slice(offset, Math.min(offset + SLICE_SIZE, file.size)), signal).then(buffer => new Uint8Array(buffer));
+        const pending = readBlob(file.slice(offset, Math.min(offset + SLICE_SIZE, size)), signal).then(buffer => new Uint8Array(buffer));
         // 预读可能在当前块计算时失败；等用到该块再报告错误。
         pending.catch(() => {});
         return pending;
       };
       // 空文件也应尝试打开，不能把已删除、不可读或伪装成空文件的项目直接算成空摘要。
-      if (file.size === 0) {
+      if (size === 0) {
         const empty = await readBlob(file, signal);
         if (signal.aborted) return null;
         if (empty.byteLength !== 0) throw new Error('Unexpected file read length');
         onProgress(1);
       }
-      let next = file.size > 0 ? readSlice(0) : null;
+      let next = size > 0 ? readSlice(0) : null;
       let lastYield = performance.now();
-      for (let offset = 0; offset < file.size; offset += SLICE_SIZE) {
+      for (let offset = 0; offset < size; offset += SLICE_SIZE) {
         if (signal.aborted) return null;
         const bytes = await next;
         if (signal.aborted) return null;
-        if (bytes.length !== Math.min(SLICE_SIZE, file.size - offset)) throw new Error('Unexpected file read length');
-        next = offset + SLICE_SIZE < file.size ? readSlice(offset + SLICE_SIZE) : null;
+        if (bytes.length !== Math.min(SLICE_SIZE, size - offset)) throw new Error('Unexpected file read length');
+        next = offset + SLICE_SIZE < size ? readSlice(offset + SLICE_SIZE) : null;
         for (const {hasher} of hashers) {
           for (let start = 0; start < bytes.length; start += HASH_STEP) {
             hasher.update(bytes.subarray(start, start + HASH_STEP));
@@ -3313,7 +3313,7 @@
             }
           }
         }
-        onProgress((offset + bytes.length) / file.size);
+        onProgress((offset + bytes.length) / size);
       }
       if (signal.aborted) return null;
       return hashers.map(item => ({algorithm: item.id, hex: item.hasher.digest()}));
@@ -3321,9 +3321,11 @@
 
     async function hashFile(file, ids, signal, onProgress) {
       if (signal.aborted) return null;
+      const size = file.size;
+      if (!Number.isSafeInteger(size) || size < 0) throw new Error('Invalid file size');
       const subtle = window.crypto && window.crypto.subtle;
       try {
-        if (!bufferedHashBusy && file.size <= BUFFER_LIMIT && subtle && ids.some(id => WEB_CRYPTO.has(id))) {
+        if (!bufferedHashBusy && size <= BUFFER_LIMIT && subtle && ids.some(id => WEB_CRYPTO.has(id))) {
           bufferedHashBusy = true;
           try {
             let bytes;
@@ -3333,12 +3335,12 @@
               // 整文件读不进内存时改走分块读取。
             }
             if (signal.aborted) return null;
-            if (bytes && bytes.length === file.size) return await hashBuffered(bytes, ids, subtle, signal, onProgress);
+            if (bytes && bytes.length === size) return await hashBuffered(bytes, ids, subtle, signal, onProgress);
           } finally {
             bufferedHashBusy = false;
           }
         }
-        return await hashStreamed(file, ids, signal, onProgress);
+        return await hashStreamed(file, size, ids, signal, onProgress);
       } catch (error) {
         if (signal.aborted) return null;
         throw error;
