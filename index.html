@@ -58,7 +58,7 @@
       --surface-high: #eae6ef;
       --text: #211d25;
       --muted: #686370;
-      --outline: #bdb7c5;
+      --outline: #87808e;
       --outline-soft: #e2dee7;
       --primary: #6750a4;
       --on-primary: #ffffff;
@@ -82,7 +82,7 @@
       --surface-high: #302b35;
       --text: #e8e0eb;
       --muted: #c9c2ce;
-      --outline: #514b57;
+      --outline: #8a8291;
       --outline-soft: #39343d;
       --error: #ffb4ab;
       --error-container: #601410;
@@ -255,7 +255,6 @@
     }
 
     body {
-      min-width: 320px;
       min-height: 100vh;
       margin: 0;
       background: var(--bg);
@@ -377,6 +376,7 @@
       right: 0;
       z-index: 30;
       width: 248px;
+      max-width: calc(100vw - 32px);
       padding: 14px;
       border: 1px solid var(--outline-soft);
       border-radius: 20px;
@@ -544,8 +544,15 @@
       text-underline-offset: 3px;
     }
 
-    .dropzone:hover .select-hint {
+    .dropzone:hover .select-hint,
+    .dropzone.is-dragging .select-hint {
+      color: var(--on-primary-container);
       text-decoration-color: currentColor;
+    }
+
+    .dropzone:hover .replace-hint,
+    .dropzone.is-dragging .replace-hint {
+      color: var(--on-primary-container);
     }
 
     .file-state {
@@ -558,7 +565,9 @@
     }
 
     .file-details strong {
+      overflow-wrap: break-word;
       overflow-wrap: anywhere;
+      white-space: pre-wrap;
     }
 
     .replace-hint {
@@ -850,6 +859,12 @@
       place-items: center;
     }
 
+    .banner-copy {
+      min-width: 0;
+      overflow-wrap: break-word;
+      overflow-wrap: anywhere;
+    }
+
     .banner-copy strong,
     .banner-copy span {
       display: block;
@@ -977,6 +992,7 @@
 
     .text-button:hover:not(:disabled) {
       background: var(--primary-container);
+      color: var(--on-primary-container);
     }
 
     .text-button:disabled {
@@ -1241,7 +1257,19 @@
       }
     }
 
-    @media (max-width: 320px) {
+    @media (max-width: 328px) {
+      .palette-menu {
+        right: -48px;
+      }
+
+      .swatches {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .file-state {
+        padding-right: 24px;
+      }
+
       .algorithm-option {
         min-height: 40px;
         padding: 0 10px;
@@ -1256,6 +1284,34 @@
       .results-heading {
         align-items: flex-start;
         flex-direction: column;
+      }
+    }
+
+    @media (forced-colors: active) {
+      .algorithm-option input:checked {
+        forced-color-adjust: none;
+        border-color: Highlight;
+        background: Highlight;
+      }
+
+      .algorithm-mark::after {
+        forced-color-adjust: none;
+        border-color: HighlightText;
+      }
+
+      .swatch {
+        forced-color-adjust: none;
+        border: 1px solid CanvasText;
+      }
+
+      .swatch.is-active {
+        outline: 2px solid Highlight;
+        outline-offset: 2px;
+      }
+
+      .swatch:focus-visible {
+        outline: 3px solid CanvasText;
+        outline-offset: 4px;
       }
     }
 
@@ -1393,7 +1449,7 @@
           <label>
             <span class="visually-hidden">预期哈希</span>
             <textarea class="expected-input" id="expectedInput" rows="3" spellcheck="false" autocapitalize="off"
-              autocorrect="off" placeholder="粘贴预期哈希，例如 SHA-256: e3b0c442… 或 sha256sum 输出"></textarea>
+              autocorrect="off" autocomplete="off" aria-describedby="compareHint" placeholder="粘贴预期哈希，例如 SHA-256: e3b0c442… 或 sha256sum 输出"></textarea>
           </label>
           <div class="compare-tools">
             <p class="compare-hint" id="compareHint">计算完成后会自动比对，忽略大小写和分隔符。</p>
@@ -2652,7 +2708,8 @@
         ambiguous: '清单中有多个路径指向同名文件，无法区分',
         unusable: '清单中当前文件的校验值无法识别'
       }[scoped.issue];
-      clearExpected.disabled = !expectedInput.value;
+      expectedInput.setAttribute('aria-invalid', String(parsed.invalid));
+      clearExpected.disabled = !input;
       const missing = missingCandidates();
       applySuggested.hidden = !expectedEntries.length || !missing.length;
       applySuggested.textContent = selectedAlgorithms().length ? '补选可能的算法' : '选择这些算法';
@@ -2798,7 +2855,6 @@
       const isCalculating = Boolean(activeCalculation);
       // 计算中按钮变成“取消计算”，大文件不必等到算完或者靠改选项才能中止。
       computeButton.disabled = !isCalculating && (!selectedFile || !selectedAlgorithms().length);
-      computeButton.setAttribute('aria-busy', String(isCalculating));
       computeLabel.textContent = isCalculating ? '取消计算' : (hasExpectedValue() ? '计算并比对' : '计算哈希');
       computeIcon.hidden = isCalculating;
       buttonSpinner.hidden = !isCalculating;
@@ -2819,10 +2875,12 @@
       if (kind === 'loading') {
         const track = document.createElement('div');
         track.className = 'loading-track';
-        track.setAttribute('aria-hidden', 'true');
-        const bar = document.createElement('span');
-        bar.style.width = `${Math.max(4, Math.round(progress * 100))}%`;
-        track.append(bar);
+        track.setAttribute('role', 'progressbar');
+        track.setAttribute('aria-label', '摘要计算进度');
+        track.setAttribute('aria-valuemin', '0');
+        track.setAttribute('aria-valuemax', '100');
+        track.append(document.createElement('span'));
+        setProgressValue(track, progress);
         resultsPanel.append(track);
       }
       const state = document.createElement('div');
@@ -2845,15 +2903,25 @@
       resultsPanel.setAttribute('aria-busy', String(kind === 'loading'));
     }
 
+    function progressPercent(progress) {
+      return Math.max(0, Math.min(100, Math.floor(progress * 100)));
+    }
+
+    function setProgressValue(track, progress) {
+      const percent = progressPercent(progress);
+      track.setAttribute('aria-valuenow', String(percent));
+      track.firstElementChild.style.width = `${percent}%`;
+    }
+
     // 进度更新只改已有的进度条和文字，避免整块重建导致宽度过渡失效。
     function showProgress(description, progress) {
-      const bar = resultsPanel.querySelector('.loading-track span');
+      const track = resultsPanel.querySelector('.loading-track');
       const detail = resultsPanel.querySelector('.empty-description');
-      if (!bar || !detail) {
+      if (!track || !detail) {
         renderMessage('正在计算摘要', description, 'loading', progress);
         return;
       }
-      bar.style.width = `${Math.max(4, Math.round(progress * 100))}%`;
+      setProgressValue(track, progress);
       detail.textContent = description;
     }
 
@@ -3259,7 +3327,7 @@
       activeCalculation = controller;
       updateComputeButton();
       setStatus('正在读取文件并计算摘要…');
-      renderMessage('正在计算摘要', '大文件可能需要一点时间，请保持页面打开。', 'loading', 0.04);
+      renderMessage('正在计算摘要', '大文件可能需要一点时间，请保持页面打开。', 'loading');
       const started = performance.now();
       let finished = false;
       try {
@@ -3271,7 +3339,7 @@
           if (name === lastName && now - lastPaint < 100) return;
           lastName = name;
           lastPaint = now;
-          const percent = Math.round(progress * 100);
+          const percent = progressPercent(progress);
           setStatus(name ? `正在计算 ${name} · ${percent}%` : `正在读取并计算 · ${percent}%`, '', true);
           showProgress(name ? `当前算法 ${name}` : '文件正在分块处理。', progress);
         });
