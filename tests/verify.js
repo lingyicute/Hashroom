@@ -331,6 +331,12 @@ async function main() {
   const odd = {size: oddSize, slice: (start, end) => new Blob([buf.subarray(start, Math.min(end, oddSize))])};
   const oddResult = await hashFile(odd, ['MD5'], freshSignal(), () => {});
   assert.strictEqual(oddResult[0].hex, crypto.createHash('md5').update(buf.subarray(0, oddSize)).digest('hex'));
+  const empty = await hashFile(new Blob([]), ['MD5'], freshSignal(), () => {});
+  assert.strictEqual(empty[0].hex, expected('MD5', Buffer.alloc(0)));
+  const gone = {size: 0, arrayBuffer: async () => { throw new Error('file was removed'); }};
+  await assert.rejects(hashFile(gone, ['MD5'], freshSignal(), () => {}), /file was removed/);
+  const changedEmpty = {size: 0, arrayBuffer: async () => new ArrayBuffer(1)};
+  await assert.rejects(hashFile(changedEmpty, ['MD5'], freshSignal(), () => {}), /Unexpected file read length/);
   console.log('ok    hashFile');
   await checkCancellation();
   await checkLargeStream();

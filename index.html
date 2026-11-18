@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-l+WmnMYVhciQ9hDSQIX/uKMA90cAd89nOX+wEeKUGRo='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-EJ8361zf5aUstXPjmHlSoMABAXDFZF8+H6dkIWPopsE='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -3250,6 +3250,13 @@
         pending.catch(() => {});
         return pending;
       };
+      // 空文件也应尝试打开，不能把已删除、不可读或伪装成空文件的项目直接算成空摘要。
+      if (file.size === 0) {
+        const empty = await readBlob(file, signal);
+        if (signal.aborted) return null;
+        if (empty.byteLength !== 0) throw new Error('Unexpected file read length');
+        onProgress(1);
+      }
       let next = file.size > 0 ? readSlice(0) : null;
       let lastYield = performance.now();
       for (let offset = 0; offset < file.size; offset += SLICE_SIZE) {
