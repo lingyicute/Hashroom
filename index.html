@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-2PY1UrkOKR3oT07esyXsFwFmCpV8AYtbW3xT/GMYzCo='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-i65TKPyBxwkqY8RNd05LfONf76XYdpcHZxWKBDXQD1M='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2488,7 +2488,7 @@
     }
 
     function normalizeDigest(text) {
-      return text.replace(/[\u200b-\u200d\u2060\ufeff]/g, '').replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, ' ');
+      return text.replace(/[\u200b-\u200d\u2060\ufeff]/g, '').replace(/[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, ' ');
     }
 
     const WINDOWS_PATH = /^(?:[a-z]:[\\/]|\\\\|\.{1,2}\\)/i;

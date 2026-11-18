@@ -440,7 +440,7 @@ async function main() {
   assert.deepStrictEqual(brokenManifest.files.map(entry => entry.path), ['a/same.iso', 'b/same.iso']);
   assert.strictEqual(entriesForFile(brokenManifest.entries, 'same.iso', brokenManifest.files).issue, 'ambiguous');
   // 网页上复制来的哈希可能用不换行空格、全角空格分组或夹带零宽字符；文件名可能是 NFD 形式。
-  for (const space of ['\u00a0', '\u3000', '\u202f']) {
+  for (const space of ['\u00a0', '\u3000', '\u2028', '\u2029', '\u202f']) {
     const parsed = parseExpected(`SHA-256:${space}${sha256.match(/.{8}/g).join(space)}`);
     assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex]), [['SHA-256', sha256]], JSON.stringify(space));
   }
