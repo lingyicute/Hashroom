@@ -483,6 +483,12 @@ async function main() {
   const sri = ['sha256', 'sha384'].map(id => `${id}-${crypto.createHash(id).update('abc').digest('base64')}`);
   const sriResult = parseExpected(`${sri[0]}?option=1 ${sri[1]}`);
   assert.deepStrictEqual(sriResult.entries.map(entry => entry.algorithm), ['SHA-256', 'SHA-384']);
+  const mixedSri = parseExpected(`future256-${Buffer.from(sha256, 'hex').toString('base64')} ${sri.join(' ')}`);
+  assert.deepStrictEqual(mixedSri.entries, sriResult.entries);
+  assert.deepStrictEqual(mixedSri.unsupported, ['future256']);
+  assert.strictEqual(mixedSri.partialInvalid, true);
+  assert.strictEqual(mixedSri.invalidLines, 1);
+  assert.strictEqual(parseExpected('ordinary-text').unsupported.length, 0);
   assert.deepStrictEqual(parseExpected(`# ${sha256}\n; ${sha256}`).entries, []);
   const tooLarge = parseExpected(`${sha256}\n${'copy '.repeat(60000)}`);
   assert.strictEqual(tooLarge.tooLarge, true);
