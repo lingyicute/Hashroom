@@ -234,11 +234,21 @@ async function main() {
     assert.strictEqual(parsed.entries[0].hex.length, length, line);
   });
   assert.strictEqual(parseExpected('CRC32 (deadbeef) = cbf43926').entries[0].hex, 'cbf43926');
-  // coreutils 转义过文件名的行（行首带反斜杠）认不出文件名，但哈希和算法照常识别。
-  for (const [line, algorithm] of [[`\\${sha256}  a\\nb.txt`, null], [`\\${sha256} *dir\\\\x.bin`, null], [`\\SHA256 (a\\nb.txt) = ${sha256}`, 'SHA-256']]) {
+  // GNU coreutils 的文件名转义不能把带名字的条目变成无名条目。
+  for (const [line, algorithm, file] of [
+    [`\\${sha256}  a\\nb.txt`, null, 'a\nb.txt'],
+    [`\\${sha256} *dir\\\\x.bin`, null, 'dir\\x.bin'],
+    [`\\SHA256 (a\\rb.txt) = ${sha256}`, 'SHA-256', 'a\rb.txt'],
+    [`${sha256}   padded  name  `, null, ' padded  name  '],
+    [`SHA256 (a\u200bb\u3000c) = ${sha256}`, 'SHA-256', 'a\u200bb\u3000c']
+  ]) {
     const parsed = parseExpected(line);
-    assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex, entry.file]), [[algorithm, sha256, '']], line);
+    assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex, entry.file]), [[algorithm, sha256, file]], line);
+    assert.strictEqual(entriesForFile(parsed.entries, file).entries.length, 1);
+    assert.strictEqual(entriesForFile(parsed.entries, 'elsewhere').entries.length, 0);
   }
+  assert.strictEqual(parseExpected(`\\${sha256}  bad\\q.iso`).invalid, true);
+  assert.strictEqual(parseExpected('cbf43926  cafe  edition.iso').entries[0].file, 'cafe  edition.iso');
   // 网页上复制来的哈希可能用不换行空格、全角空格分组或夹带零宽字符；文件名可能是 NFD 形式。
   for (const space of ['\u00a0', '\u3000', '\u202f']) {
     const parsed = parseExpected(`SHA-256:${space}${sha256.match(/.{8}/g).join(space)}`);
@@ -336,9 +346,10 @@ async function main() {
   }
   assert.ok(parseExpected('garbage').strayLength <= 8);
   const mixed = parseExpected(`SHA256 hash of file.iso:\n${sha256}\nCertUtil: -hashfile command completed successfully.`);
-  assert.strictEqual(mixed.entries.length, 1);
-  assert.strictEqual(mixed.partialInvalid, true);
-  assert.strictEqual(mixed.invalidLines, 2);
+  assert.deepStrictEqual(mixed.entries, [{algorithm: 'SHA-256', hex: sha256, file: 'file.iso', path: 'file.iso'}]);
+  assert.strictEqual(mixed.invalidLines, 0);
+  const windows = parseExpected(`SHA256       ${sha256}       C:\\Downloads\\test.iso`);
+  assert.deepStrictEqual(windows.entries.map(({algorithm, file}) => [algorithm, file]), [['SHA-256', 'test.iso']]);
   // 整份校验清单：只比对写明了当前文件名的那一行，其他文件的行不参与。
   const list = parseExpected([
     `${sha256}  ubuntu.iso`,
@@ -350,7 +361,21 @@ async function main() {
   assert.deepStrictEqual(list.entries.map(entry => entry.file), ['ubuntu.iso', 'other.iso', 'win.iso', 'x.bin', '']);
   assert.strictEqual(entriesForFile(list.entries, 'other.iso').entries.length, 2);
   assert.strictEqual(entriesForFile(list.entries, 'other.iso').ignored, 3);
-  assert.strictEqual(entriesForFile(list.entries, 'missing.iso').ignored, 0);
+  const missing = entriesForFile(list.entries, 'missing.iso');
+  assert.strictEqual(missing.ignored, 4);
+  assert.strictEqual(missing.issue, 'missing');
+  assert.deepStrictEqual(missing.entries, list.entries.slice(-1));
+  const ambiguous = parseExpected(`${sha256}  a/same.iso\nSHA256 (b/same.iso) = ${sha256.slice(1)}`);
+  const scoped = entriesForFile(ambiguous.entries, 'same.iso', ambiguous.files);
+  assert.strictEqual(scoped.issue, 'ambiguous');
+  assert.deepStrictEqual(scoped.entries, []);
+  const normalized = parseExpected(`${sha256}  café.iso\n${'f'.repeat(64)}  cafe\u0301.iso`);
+  assert.strictEqual(entriesForFile(normalized.entries, 'café.iso').entries[0].hex, sha256);
+  assert.strictEqual(entriesForFile(normalized.entries, 'cafe\u0301.iso').entries[0].hex, 'f'.repeat(64));
+  const unusable = parseExpected(`SHA256 (a.iso) = ${sha256.slice(1)}\n${sha256}  b.iso`);
+  assert.strictEqual(entriesForFile(unusable.entries, 'a.iso', unusable.files).issue, 'unusable');
+  const base64 = parseExpected(`sha256sum ${Buffer.from(sha256, 'hex').toString('base64')} *other.iso`);
+  assert.strictEqual(entriesForFile(base64.entries, 'a.iso').entries.length, 0);
   assert.strictEqual(entriesForFile(list.entries, '').entries.length, 5);
   // 只用一个空格或制表符分隔哈希与文件名的清单（脚本输出、表格粘贴）也要认出文件名，才能按文件筛选。
   assert.deepStrictEqual(parseExpected(`${sha256} ubuntu.iso`).entries.map(entry => entry.file), ['ubuntu.iso']);

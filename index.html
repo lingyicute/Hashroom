@@ -2407,42 +2407,84 @@
       return [{}];
     }
 
+    function normalizeDigest(text) {
+      return text.replace(/[\u200b-\u200d\u2060\ufeff]/g, '').replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, ' ');
+    }
+
+    function checksumFile(name, escaped = false) {
+      let invalidFile = false;
+      if (escaped) {
+        name = name.replace(/\\([\s\S]|$)/g, (raw, char) => {
+          if (char === 'n') return '\n';
+          if (char === 'r') return '\r';
+          if (char === '\\') return '\\';
+          invalidFile = true;
+          return raw;
+        });
+      } else {
+        // Windows 清单可能用 \ 作路径分隔符；GNU 转义后的反斜杠则是文件名的一部分。
+        name = name.replace(/\\/g, '/');
+      }
+      const path = name.replace(/^(?:\.\/)+/, '');
+      const file = path.slice(path.lastIndexOf('/') + 1);
+      return {file, path, invalidFile: invalidFile || !file};
+    }
+
     function splitChecksumLine(line) {
       const escaped = line.startsWith('\\');
       const text = escaped ? line.slice(1) : line;
-      const baseName = name => (escaped ? '' : name.trim().split(/[\\/]/).pop());
-      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\((.+)\)\s*=\s*(\S.*)$/);
-      if (bsd) return {tag: bsd[1], content: bsd[3], file: baseName(bsd[2])};
+      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\((.+)\)\s*=\s*(.*)$/);
+      if (bsd) return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
       const grouped = text.match(/^([0-9a-fx:：,，_\t \-]+)[ \t]{2,}(\S.*)$/i);
-      if (grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2]) && hexValue(grouped[1])) {
-        return {content: grouped[1].trim(), file: baseName(grouped[2])};
+      if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2])) {
+        const hex = hexValue(grouped[1]);
+        const groups = grouped[1].trim().split(/[\t :：,，_\-]+/);
+        if (hex && (HASH_LENGTHS.has(hex.length) || groups.length > 2)) return {content: grouped[1], ...checksumFile(grouped[2])};
       }
-      const sum = text.match(/^((?:\w+sum[ \t]+)?(\S+))( [ *])(.+)$/i);
-      const looksLikeDigest = match => /^[0-9a-f]{8,128}$/i.test(match[2]) ||
-        (match[1] !== match[2] && /^[A-Za-z0-9+/_-]+=*$/.test(match[2]));
-      if (sum && looksLikeDigest(sum) && !(sum[3] === '  ' && sum[1] === sum[2] && sum[2].length <= 16 && hexValue(text))) {
-        return {content: sum[1], file: baseName(sum[4])};
+      const prefixed = text.match(/^([a-z][\w/-]*)[ \t]+(.*)$/i);
+      const tag = prefixed && (/sum$/i.test(prefixed[1]) || findAlgorithmNames(prefixed[1]).length ||
+        findAlgorithmNames(prefixed[1], UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;
+      const payload = tag ? prefixed[2] : text;
+      const looksLikeDigest = value => /^[0-9a-f]{8,128}$/i.test(normalizeDigest(value)) ||
+        (tag && /^[A-Za-z0-9+/_-]+=*$/.test(value));
+      const sum = payload.match(/^(\S+)( [ *])(.+)$/);
+      if (sum && looksLikeDigest(sum[1]) &&
+          (escaped || sum[2] !== '  ' || sum[1].length > 16 || !hexValue(normalizeDigest(`${sum[1]} ${sum[3]}`)))) {
+        return {tag, content: sum[1], ...checksumFile(sum[3], escaped)};
       }
-      // 脚本或表格用一个空格或制表符分隔时，只有末尾明显是文件名才拆分。
-      const spaced = text.match(/^((?:\w+sum[ \t]+)?(\S+))[ \t]+(\S.*)$/i);
-      if (spaced && looksLikeDigest(spaced) && /[./\\]/.test(spaced[3])) return {content: spaced[1], file: baseName(spaced[3])};
-      return {content: line, file: ''};
+      if (escaped) return {invalidFile: true};
+      // 表格或手写的清单也可能只用一个空格或制表符分隔；不能把下一组十六进制当作文件名。
+      const spaced = payload.match(/^(\S+)[ \t]+(\S.*)$/);
+      if (spaced && looksLikeDigest(spaced[1]) && /[./\\]/.test(spaced[2])) {
+        return {tag, content: spaced[1], ...checksumFile(spaced[2])};
+      }
+      const prefixFile = text.match(/^(.+?)[:：][ \t]+(.+)$/);
+      if (prefixFile && !/\s[/\\]\s/.test(prefixFile[1]) && /[.\/\\]/.test(prefixFile[1])) {
+        return {content: prefixFile[2], ...checksumFile(prefixFile[1])};
+      }
+      return {content: line};
     }
 
-    function normalizeText(text) {
-      return text.normalize('NFC').replace(/[\u200b-\u200d\u2060\ufeff]/g, '').replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, ' ');
-    }
-
-    // 清单里有一行写明了当前文件时，其他文件的条目不参与比对。
-    function entriesForFile(entries, fileName) {
-      const name = fileName ? normalizeText(fileName) : '';
-      if (!name || !entries.some(entry => entry.file === name)) return {entries, ignored: 0};
-      const kept = entries.filter(entry => !entry.file || entry.file === name);
-      return {entries: kept, ignored: entries.length - kept.length};
+    function entriesForFile(entries, fileName, files = entries) {
+      if (!fileName) return {entries, ignored: 0};
+      const named = files.filter(record => record.file);
+      if (!named.length) return {entries, ignored: 0};
+      let matches = named.filter(record => record.file === fileName);
+      if (!matches.length) {
+        const name = fileName.normalize('NFC');
+        matches = named.filter(record => record.file.normalize('NFC') === name);
+      }
+      const paths = new Set(matches.map(record => record.path));
+      const [path] = paths;
+      let issue = paths.size === 0 ? 'missing' : paths.size > 1 ? 'ambiguous' : null;
+      const kept = entries.filter(entry => !entry.file || (!issue && entry.path === path));
+      if (!issue && !kept.some(entry => entry.file)) issue = 'unusable';
+      return {entries: kept, ignored: entries.length - kept.length, issue};
     }
 
     function parseExpected(raw) {
       const entries = [];
+      const files = new Map();
       const unsupported = new Map();
       let invalidLines = 0;
       let unsupportedLines = 0;
@@ -2450,19 +2492,27 @@
       let malformed = null;
       const tooLarge = raw.length > MAX_EXPECTED_LENGTH;
       if (!tooLarge) {
-        for (const row of normalizeText(raw).split(/\r\n?|[\n\u2028\u2029]/)) {
-          const line = row.trim();
-          if (!line || /^(?:#|;|\/\/)/.test(line)) continue;
-          if (line.length > MAX_LINE_LENGTH) {
+        const rows = raw.split(/\r\n?|[\n\u2028\u2029]/);
+        for (let i = 0; i < rows.length; i += 1) {
+          const line = rows[i].replace(/^[\s\u200b-\u200d\u2060]+/, '');
+          if (!line || /^(?:#|;|\/\/)/.test(line) || /^CertUtil: -hashfile command completed successfully\.\s*$/i.test(line)) continue;
+          if (rows[i].length > MAX_LINE_LENGTH) {
             invalidLines += 1;
             continue;
           }
-          const {content, file, tag} = splitChecksumLine(line);
-          const fields = parseDigestLine(content, tag);
+          // CertUtil 的标签与文件名在摘要的上一行。
+          const cert = line.match(/^([a-z][\w/-]*) hash of (?:file )?(.+):\s*$/i);
+          const record = cert ? {tag: cert[1], content: '', ...checksumFile(cert[2])} : splitChecksumLine(line);
+          if (cert && i + 1 < rows.length && rows[i + 1].length <= MAX_LINE_LENGTH && hexValue(normalizeDigest(rows[i + 1]))) {
+            record.content = rows[++i];
+          }
+          const {content, file, path, tag, invalidFile} = record;
+          if (file && !invalidFile) files.set(path, {file, path});
+          const fields = invalidFile ? [{}] : parseDigestLine(normalizeDigest(content).trim(), tag);
           if (fields.some(field => !field.hex)) invalidLines += 1;
           if (fields.some(field => field.unsupported)) unsupportedLines += 1;
           for (const field of fields) {
-            if (field.hex) entries.push({algorithm: field.algorithm, hex: field.hex, file});
+            if (field.hex) entries.push({algorithm: field.algorithm, hex: field.hex, file: file || '', ...(file ? {path} : {})});
             else if (field.unsupported) {
               const key = field.unsupported.toLowerCase();
               if (!unsupported.has(key) && unsupported.size < MAX_NAMES_PER_LINE) unsupported.set(key, field.unsupported);
@@ -2473,7 +2523,7 @@
           }
         }
       }
-      return {entries, invalid: tooLarge || invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0,
+      return {entries, files: [...files.values()], invalid: tooLarge || invalidLines > 0 && !entries.length, partialInvalid: invalidLines > 0 && entries.length > 0,
         invalidLines, unsupportedLines, strayLength, malformed, tooLarge, unsupported: [...unsupported.values()]};
     }
 
@@ -2540,9 +2590,14 @@
 
     function updateComparison() {
       const parsed = parseExpected(expectedInput.value);
-      const scoped = entriesForFile(parsed.entries, selectedFile && selectedFile.name);
+      const scoped = entriesForFile(parsed.entries, selectedFile && selectedFile.name, parsed.files);
       expectedEntries = scoped.entries;
-      expectedInvalid = parsed.invalid;
+      expectedInvalid = parsed.invalid || Boolean(scoped.issue);
+      const scopeMessage = {
+        missing: '清单里没有当前文件的名字',
+        ambiguous: '清单中有多个路径指向同名文件，无法区分',
+        unusable: '清单中当前文件的校验值无法识别'
+      }[scoped.issue];
       clearExpected.disabled = !expectedInput.value;
       const missing = missingCandidates();
       applySuggested.hidden = !expectedEntries.length || !missing.length;
@@ -2585,6 +2640,12 @@
         return;
       }
 
+      if (!expectedEntries.length && scopeMessage) {
+        compareHint.textContent = `已忽略 ${scoped.ignored} 条无法归属当前文件的校验值。`;
+        renderBanner('info', scopeMessage, '请确认对应的校验行，或只粘贴当前文件的摘要。');
+        return;
+      }
+
       const named = [...new Set(expectedEntries.map(entry => entry.algorithm).filter(Boolean))];
       const unnamed = expectedEntries.filter(entry => !entry.algorithm);
       const unnamedLengths = [...new Set(unnamed.map(entry => entry.hex.length))];
@@ -2597,7 +2658,8 @@
       // 不支持算法的行已经在上面说明过，这里只数其余无法识别的行，免得同一行被说两遍。
       const otherInvalid = parsed.invalidLines - parsed.unsupportedLines;
       if (parsed.partialInvalid && otherInvalid > 0) hint += `。${parsed.unsupported.length ? '另有' : '有'} ${otherInvalid} 行无法识别，已忽略`;
-      if (scoped.ignored) hint += `。已忽略 ${scoped.ignored} 条属于其他文件的校验值`;
+      if (scopeMessage) hint += `。${scopeMessage}，仅使用未注明文件名的摘要`;
+      if (scoped.ignored) hint += `。已忽略 ${scoped.ignored} 条无法归属当前文件的校验值`;
       compareHint.textContent = `${hint}。`;
 
       if (!currentResults.length) {
