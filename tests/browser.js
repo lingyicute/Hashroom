@@ -39,14 +39,22 @@ async function banner(page, kind, title) {
 async function offline(page) {
   const network = [];
   page.on('request', request => { if (/^https?:/.test(request.url())) network.push(request.url()); });
-  await page.addInitScript(() => { window.AbortController = window.TextEncoder = undefined; });
+  await page.addInitScript(() => {
+    window.AbortController = window.TextEncoder = undefined;
+    Array.prototype.flatMap = String.prototype.trimStart = String.prototype.trimEnd = undefined;
+    Blob.prototype.arrayBuffer = undefined;
+    if (window.crypto) Object.defineProperty(window.crypto, 'subtle', {value: undefined});
+  });
   await page.goto(pathToFileURL(path).href);
   assert.equal(await page.locator('input[name=algorithm]:enabled').count(), 14);
   await choose(page, 'offline.txt');
+  const hex = checksum('abc');
+  await expected(page, `SHA256     ${hex}     C:\\Downloads\\offline.txt`);
   await compute(page);
-  const digest = page.locator('.digest-value');
-  await digest.waitFor();
-  assert.equal(await digest.textContent(), checksum('abc'));
+  await banner(page, 'match', /SHA-256/);
+  assert.equal(await page.locator('.digest-value').textContent(), hex);
+  await expected(page, `${hex} offline.txt`);
+  await banner(page, 'match', /SHA-256/);
   assert.deepEqual(network, []);
 }
 

@@ -50,7 +50,7 @@ Web Crypto 在非安全上下文（非 HTTPS、非 localhost）下不可用，�
 - 也识别哈希后用单空格或制表符分隔的简单文件名（含 `LICENSE` 这类无扩展名文件）或明显的路径。复杂文件名建议用 GNU 或 BSD 格式，避免与分组摘要或注释混淆。
 - CRC32 使用 slicing-by-8 查表，每轮处理 8 个字节，比逐字节查表快约一倍。
 - 离开页面的确认只在计算期间注册，平时不影响浏览器的往返缓存（bfcache）。
-- 不依赖正则后行断言和 `Element.replaceChildren()`，旧版 Safari 等浏览器也能正常加载页面。
+- 不依赖正则后行断言、`Element.replaceChildren()`、`Array.prototype.flatMap()` 或 `trimStart()` / `trimEnd()`，以兼容较旧的浏览器。
 - 算法勾号不画在 `input` 的伪元素上（各浏览器对表单控件上的伪元素支持不一致，Firefox 就不可靠），改画在相邻的 `span` 上。
 
 ## 验证

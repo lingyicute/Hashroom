@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-AeeBBKAP3nSov1/5QMBU4eWDHxWtnyempimdwa+zsiM='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-eygb2f+PBXvmz+rnKFIJuuZRFnljpJ+uyAG+gldX04o='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -1970,9 +1970,13 @@
 
     // 状态用 Int32Array 保存：值始终是 32 位整数，比 Uint32Array 里的无符号数快得多。
     // 每个 64 位 lane 拆成低、高两个 32 位字（state[2i]、state[2i+1]）。
-    const KECCAK_RC = Int32Array.from('0000000000000001 0000000000008082 800000000000808a 8000000080008000 000000000000808b 0000000080000001 8000000080008081 8000000000008009 000000000000008a 0000000000000088 0000000080008009 000000008000000a 000000008000808b 800000000000008b 8000000000008089 8000000000008003 8000000000008002 8000000000000080 000000000000800a 800000008000000a 8000000080008081 8000000000008080 0000000080000001 8000000080008008'.split(' ').flatMap(hex => [parseInt(hex.slice(8), 16), parseInt(hex.slice(0, 8), 16)]));
+    const KECCAK_RC = new Int32Array(48);
+    '0000000000000001 0000000000008082 800000000000808a 8000000080008000 000000000000808b 0000000080000001 8000000080008081 8000000000008009 000000000000008a 0000000000000088 0000000080008009 000000008000000a 000000008000808b 800000000000008b 8000000000008089 8000000000008003 8000000000008002 8000000000000080 000000000000800a 800000008000000a 8000000080008081 8000000000008080 0000000080000001 8000000080008008'.split(' ').forEach((hex, index) => {
+      KECCAK_RC[index * 2] = parseInt(hex.slice(8), 16);
+      KECCAK_RC[index * 2 + 1] = parseInt(hex.slice(0, 8), 16);
+    });
 
-    // Keccak-f[1600]：24 轮完全展开，lane 都放在局部变量里，避免数组间接访问和循环开销，
+    // Keccak-f[1600]：每轮的 lane 操作展开，lane 都放在局部变量里，避免数组间接访问和循环开销，
     // 比逐 lane 的循环写法快数倍。ρ 的旋转量和 π 的换位已按标准表写死在代码里。
     function keccakF(state) {
       let l0 = state[0], h0 = state[1],
@@ -2551,8 +2555,9 @@
           HASH_LENGTHS.has(joined.length) && (!HASH_LENGTHS.has(hexValue(normalizeDigest(sum[1])).length) || /\S[ \t]+\S/.test(sum[3])));
         if (!isGrouped) {
           // PowerShell 的列宽填充不属于绝对路径；GNU 标记后的文件名则必须原样保留。
-          const tablePath = !escaped && tag && !/sum$/i.test(tag) && WINDOWS_PATH.test(sum[3].trimStart());
-          const name = tablePath ? sum[3].trimStart() : sum[3];
+          const unpadded = sum[3].replace(/^[ \t]+/, '');
+          const tablePath = !escaped && tag && !/sum$/i.test(tag) && WINDOWS_PATH.test(unpadded);
+          const name = tablePath ? unpadded : sum[3];
           return {tag, content: sum[1], ...checksumFile(name, escaped)};
         }
       }
@@ -2569,7 +2574,7 @@
       if (spaced && looksLikeDigest(spaced[1])) {
         const [, value, name] = spaced;
         const pathLike = /[./\\]/.test(name) && !/^[./\\]+[ \t]/.test(name);
-        const token = name.trimEnd();
+        const token = name.replace(/[ \t]+$/, '');
         // 不猜无结构的多词注释，也不把连续十六进制组解释成文件名。
         const singleName = /^[^\s*:=]+$/.test(token) && !hexValue(normalizeDigest(token));
         if (pathLike || (singleName && (tag ? labelledField(tag, normalizeDigest(value)).hex : HASH_LENGTHS.has(hexValue(normalizeDigest(value)).length)))) {
@@ -2810,7 +2815,8 @@
       const named = [...new Set(expectedEntries.map(entry => entry.algorithm).filter(Boolean))];
       const unnamed = expectedEntries.filter(entry => !entry.algorithm);
       const unnamedLengths = [...new Set(unnamed.map(entry => entry.hex.length))];
-      const lengthNames = [...new Set(unnamed.flatMap(entry => algorithmsForLength(entry.hex.length).map(item => item.id)))];
+      const lengthNames = [];
+      for (const length of unnamedLengths) lengthNames.push(...algorithmsForLength(length).map(item => item.id));
       let hint = named.length ? `已识别 ${named.join('、')}` : `已识别 ${unnamedLengths.join('、')} 位十六进制`;
       if (named.length && unnamedLengths.length) hint += ` 及 ${unnamedLengths.join('、')} 位十六进制`;
       if (lengthNames.length) hint += `，可能是 ${lengthNames.join('、')}`;
