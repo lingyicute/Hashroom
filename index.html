@@ -1110,6 +1110,17 @@
       user-select: all;
     }
 
+    .copy-status:not(:empty) {
+      margin: 0 0 8px;
+      color: var(--muted);
+      font-size: 13px;
+      text-align: end;
+    }
+
+    .copy-status.is-error:not(:empty) {
+      color: var(--error);
+    }
+
     .copy-button {
       width: 40px;
       height: 40px;
@@ -1407,6 +1418,7 @@
             <span>复制全部</span>
           </button>
         </div>
+        <p class="copy-status" id="copyStatus" role="status" aria-live="polite" aria-atomic="true"></p>
         <div class="results-panel" id="resultsPanel"></div>
       </section>
 
@@ -1473,6 +1485,7 @@
     const resultsPanel = document.getElementById('resultsPanel');
     const resultsSection = document.getElementById('resultsSection');
     const copyAllButton = document.getElementById('copyAllButton');
+    const copyStatus = document.getElementById('copyStatus');
     const themeToggle = document.getElementById('themeToggle');
     const paletteToggle = document.getElementById('paletteToggle');
     const paletteMenu = document.getElementById('paletteMenu');
@@ -1496,6 +1509,8 @@
     let activeCalculation = null;
     let lastElapsed = '';
     const copyTimers = new WeakMap();
+    let copyRequest = 0;
+    let copyStatusTimer;
 
     function rotl32(value, bits) {
       return ((value << bits) | (value >>> (32 - bits))) >>> 0;
@@ -2890,6 +2905,7 @@
       currentResults = [];
       lastElapsed = '';
       copyAllButton.disabled = true;
+      clearCopyFeedback();
       const previous = copyTimers.get(copyAllButton);
       if (previous) clearTimeout(previous);
       const icon = copyAllButton.querySelector('.copy-icon');
@@ -2959,31 +2975,43 @@
 
     function fallbackCopy(text) {
       const active = document.activeElement;
+      const selection = active && typeof active.selectionStart === 'number' ?
+        [active.selectionStart, active.selectionEnd, active.selectionDirection] : null;
       const textarea = document.createElement('textarea');
       textarea.value = text;
       textarea.setAttribute('readonly', '');
-      // 固定在视口左上角，聚焦时页面不会跳到底部；12pt 字号避免 iOS 聚焦时缩放页面。
+      // 固定在视口左上角；16px 避免 iOS 聚焦时缩放页面。
       textarea.style.position = 'fixed';
       textarea.style.top = '0';
       textarea.style.left = '0';
-      textarea.style.fontSize = '12pt';
+      textarea.style.fontSize = '16px';
       textarea.style.opacity = '0';
       document.body.append(textarea);
-      textarea.select();
-      // iOS Safari 的 select() 选不中只读文本框里的内容，需要再显式设置一次选区。
-      textarea.setSelectionRange(0, text.length);
-      let copied = false;
       try {
-        copied = document.execCommand('copy');
-      } catch (error) {
-        // 个别浏览器不允许复制时会直接抛错：同样按失败处理，临时文本框和焦点照常还原。
+        textarea.focus({preventScroll: true});
+        textarea.select();
+        textarea.setSelectionRange(0, text.length);
+        if (!document.execCommand('copy')) throw new Error('Clipboard copy failed');
+      } finally {
+        textarea.remove();
+        if (active && active.isConnected && typeof active.focus === 'function') {
+          active.focus({preventScroll: true});
+          if (selection) active.setSelectionRange(...selection);
+        }
       }
-      textarea.remove();
-      if (active && typeof active.focus === 'function') active.focus({preventScroll: true});
-      if (!copied) throw new Error('Clipboard copy failed');
+    }
+
+    function clearCopyFeedback() {
+      copyRequest += 1;
+      clearTimeout(copyStatusTimer);
+      copyStatus.textContent = '';
+      copyStatus.classList.remove('is-error');
     }
 
     async function copyText(text, button, message) {
+      clearCopyFeedback();
+      const request = copyRequest;
+      const stillCurrent = () => copyRequest === request && button.isConnected && !button.disabled;
       try {
         let copied = false;
         if (navigator.clipboard && window.isSecureContext) {
@@ -2994,11 +3022,15 @@
             // 权限被拒或页面被嵌入时 Clipboard API 会失败，改用 execCommand 再试一次。
           }
         }
+        if (!stillCurrent()) return;
         if (!copied) fallbackCopy(text);
         const icon = button.querySelector('.copy-icon');
         if (icon) icon.innerHTML = iconMarkup.check;
         button.classList.add('is-copied');
-        setStatus(message, 'match');
+        copyStatus.textContent = message;
+        copyStatusTimer = setTimeout(() => {
+          if (stillCurrent()) copyStatus.textContent = '';
+        }, 2400);
         const previous = copyTimers.get(button);
         if (previous) clearTimeout(previous);
         copyTimers.set(button, setTimeout(() => {
@@ -3008,7 +3040,10 @@
           button.classList.remove('is-copied');
         }, 1600));
       } catch (error) {
-        setStatus('复制失败，请检查浏览器的剪贴板权限。', 'error');
+        if (stillCurrent()) {
+          copyStatus.classList.add('is-error');
+          copyStatus.textContent = '复制失败，请检查剪贴板权限，或手动选择摘要。';
+        }
       }
     }
 
