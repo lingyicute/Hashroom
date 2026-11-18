@@ -5,6 +5,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const assert = require('assert');
+const {checkScriptPolicy} = require('./check-csp');
 
 const src = fs.readFileSync(path.join(__dirname, '..', 'index.html'), 'utf8');
 const cut = (from, to) => {
@@ -190,6 +191,8 @@ async function checkCancellation() {
 }
 
 async function main() {
+  checkScriptPolicy(src);
+  console.log('ok    CSP script hashes');
   checkBitLength();
   checkDurationFormat();
   checkFileMetadata();
