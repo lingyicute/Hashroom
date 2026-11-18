@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-Occ8nyHvUNwDc7Hsk3sYo4BatBp7HETKjSrX/jzlxcE='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-dPOyYuEukLbawQWHrDlOV5k/iwq5IEpQGNeJ3AcEKYw='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2522,13 +2522,13 @@
       return {file, path, invalidFile: invalidFile || !file};
     }
 
-    function splitChecksumLine(line) {
+    function splitChecksumLine(line, allowPosix = true) {
       const escaped = line.startsWith('\\');
       const text = escaped ? line.slice(1) : line;
       const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\(([\s\S]*)\)\s*=\s*([\s\S]*)$/);
       if (bsd) return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
       // POSIX cksum 的十进制校验和、大小和可选文件名即使恰好都是十六进制字符，也不能按本工具的摘要比对。
-      const posix = !escaped && text.match(/^(0|[1-9]\d{0,9}) (?:0|[1-9]\d*)(?: ([\s\S]*))?$/);
+      const posix = allowPosix && !escaped && text.match(/^(0|[1-9]\d{0,9}) (?:0|[1-9]\d*)(?: ([\s\S]*))?$/);
       if (posix && Number(posix[1]) <= 0xffffffff) {
         return {tag: 'POSIX cksum', content: posix[1], ...(posix[2] ? checksumFile(posix[2]) : {})};
       }
@@ -2623,8 +2623,14 @@
           // CertUtil 的标签与文件名在摘要的上一行。
           const cert = line.match(/^([a-z][\w/-]*) hash of (?:file )?([\s\S]+):\s*$/i);
           const record = cert ? {tag: cert[1], content: '', ...checksumFile(cert[2])} : splitChecksumLine(line);
-          if (cert && i + 1 < rows.length && rows[i + 1].length <= MAX_LINE_LENGTH && hexValue(normalizeDigest(rows[i + 1]))) {
-            record.content = rows[++i];
+          if (cert && i + 1 < rows.length && rows[i + 1].length <= MAX_LINE_LENGTH) {
+            const next = rows[i + 1].replace(/^[ \t]+/, '');
+            // 下一行必须只有摘要；带十六进制文件名的独立清单条目不属于这个标题。
+            // 已有明确算法的 CertUtil 字节组可能从两个十进制数字开始，不使用 POSIX 猜测。
+            if (hexValue(normalizeDigest(next)) && !splitChecksumLine(next, false).file) {
+              record.content = next;
+              i += 1;
+            }
           }
           const {content, file, path, tag, invalidFile} = record;
           if (file && !invalidFile) files.set(path, {file, path});

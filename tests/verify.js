@@ -550,6 +550,14 @@ async function main() {
   const mixed = parseExpected(`SHA256 hash of file.iso:\n${sha256}\nCertUtil: -hashfile command completed successfully.`);
   assert.deepStrictEqual(mixed.entries, [{algorithm: 'SHA-256', hex: sha256, file: 'file.iso', path: 'file.iso'}]);
   assert.strictEqual(mixed.invalidLines, 0);
+  const certBytes = '12 34 ' + 'a1 '.repeat(30).trim();
+  assert.strictEqual(parseExpected(`SHA256 hash of file.iso:\n${certBytes}`).entries[0].hex, certBytes.replace(/ /g, ''));
+  const md5 = 'd41d8cd98f00b204e9800998ecf8427e';
+  const hexName = 'a'.repeat(32);
+  const separate = parseExpected(`SHA256 hash of current.iso:\n${md5}  ${hexName}`);
+  assert.deepStrictEqual(separate.entries, [{algorithm: null, hex: md5, file: hexName, path: hexName}]);
+  assert.strictEqual(entriesForFile(separate.entries, 'current.iso', separate.files).issue, 'unusable');
+  assert.strictEqual(separate.invalidLines, 1);
   const windows = parseExpected(`Algorithm   Hash   Path\n---------   ----   ----\nSHA256       ${sha256}       C:\\Downloads\\test.iso`);
   assert.strictEqual(windows.invalidLines, 0);
   assert.deepStrictEqual(windows.entries.map(({algorithm, file}) => [algorithm, file]), [['SHA-256', 'test.iso']]);
