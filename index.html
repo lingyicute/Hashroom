@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-ZbBSFvWprRrkuYk/57kMemHO/evSXRIkbVO3zz/UMZY='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-SjWSg75d8iGzHzrnVjvOakFswg8uLuS/mc1KMQ6mQHM='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2491,6 +2491,8 @@
       return text.replace(/[\u200b-\u200d\u2060\ufeff]/g, '').replace(/[\u00a0\u1680\u2000-\u200a\u202f\u205f\u3000]/g, ' ');
     }
 
+    const WINDOWS_PATH = /^(?:[a-z]:[\\/]|\\\\|\.{1,2}\\)/i;
+
     function checksumFile(name, escaped = false) {
       let invalidFile = false;
       if (escaped) {
@@ -2501,8 +2503,8 @@
           invalidFile = true;
           return raw;
         });
-      } else {
-        // Windows 清单可能用 \ 作路径分隔符；GNU 转义后的反斜杠则是文件名的一部分。
+      } else if (WINDOWS_PATH.test(name)) {
+        // 只在明显是 Windows 路径时把 \ 当分隔符。POSIX 上未转义的反斜杠也可能是文件名的一部分。
         name = name.replace(/\\/g, '/');
       }
       const path = name.replace(/^(?:\.\/)+/, '');
@@ -2513,35 +2515,38 @@
     function splitChecksumLine(line) {
       const escaped = line.startsWith('\\');
       const text = escaped ? line.slice(1) : line;
-      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\((.*)\)\s*=\s*(.*)$/);
+      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\(([\s\S]*)\)\s*=\s*([\s\S]*)$/);
       if (bsd) return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
       // POSIX cksum 输出十进制校验和和文件大小，用的并不是这里的 CRC32。
-      const posix = !escaped && text.match(/^(\d{1,10}) \d+ (.+)$/);
+      const posix = !escaped && text.match(/^(\d{1,10}) \d+ ([\s\S]+)$/);
       if (posix && !hexValue(text)) return {tag: 'POSIX cksum', content: posix[1], ...checksumFile(posix[2])};
-      const grouped = text.match(/^([0-9a-fx:：,，_\t \-]+)[ \t]{2,}(\S.*)$/i);
+      const grouped = text.match(/^([0-9a-fx:：,，_\t \-]+)[ \t]{2,}(\S[\s\S]*)$/i);
       if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2])) {
         const hex = hexValue(grouped[1]);
         const groups = grouped[1].trim().split(/[\t :：,，_\-]+/);
         if (hex && (HASH_LENGTHS.has(hex.length) || groups.length > 2)) return {content: grouped[1], ...checksumFile(grouped[2])};
       }
-      const prefixed = text.match(/^([a-z][\w/-]*)[ \t]+(.*)$/i);
+      const prefixed = text.match(/^([a-z][\w/-]*)[ \t]+([\s\S]*)$/i);
       const tag = prefixed && (/sum$/i.test(prefixed[1]) || findAlgorithmNames(prefixed[1]).length ||
         findAlgorithmNames(prefixed[1], UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;
       const payload = tag ? prefixed[2] : text;
       const looksLikeDigest = value => /^[0-9a-f]{8,128}$/i.test(normalizeDigest(value)) ||
         (tag && /^[A-Za-z0-9+/_-]+=*$/.test(value));
-      const sum = payload.match(/^(\S+)( [ *])(.+)$/);
+      const sum = payload.match(/^(\S+)( [ *])([\s\S]+)$/);
       if (sum && looksLikeDigest(sum[1]) &&
           (escaped || sum[2] !== '  ' || sum[1].length > 16 || !hexValue(normalizeDigest(`${sum[1]} ${sum[3]}`)))) {
-        return {tag, content: sum[1], ...checksumFile(sum[3], escaped)};
+        // PowerShell 的列宽填充不属于绝对路径；GNU 清单的两个分隔字符之后则必须原样保留。
+        const tablePath = !escaped && tag && !/sum$/i.test(tag) && WINDOWS_PATH.test(sum[3].trimStart());
+        const name = tablePath ? sum[3].trimStart() : sum[3];
+        return {tag, content: sum[1], ...checksumFile(name, escaped)};
       }
       if (escaped) return {invalidFile: true};
       // 表格或手写的清单也可能只用一个空格或制表符分隔；不能把下一组十六进制当作文件名。
-      const spaced = payload.match(/^(\S+)[ \t]+(\S.*)$/);
+      const spaced = payload.match(/^(\S+)[ \t]+(\S[\s\S]*)$/);
       if (spaced && looksLikeDigest(spaced[1]) && /[./\\]/.test(spaced[2])) {
         return {tag, content: spaced[1], ...checksumFile(spaced[2])};
       }
-      const prefixFile = text.match(/^(.+?)[:：][ \t]+(.+)$/);
+      const prefixFile = text.match(/^([\s\S]+?)[:：][ \t]+([\s\S]+)$/);
       if (prefixFile && !/\s[/\\]\s/.test(prefixFile[1]) && /[.\/\\]/.test(prefixFile[1])) {
         return {content: prefixFile[2], ...checksumFile(prefixFile[1])};
       }
@@ -2575,7 +2580,7 @@
       let malformed = null;
       const tooLarge = raw.length > MAX_EXPECTED_LENGTH;
       if (!tooLarge) {
-        const rows = raw.split(/\r\n?|[\n\u2028\u2029]/);
+        const rows = raw.split(/\r\n?|\n/);
         for (let i = 0; i < rows.length; i += 1) {
           const line = rows[i].replace(/^[\s\u200b-\u200d\u2060]+/, '');
           if (!line || /^(?:#|;|\/\/)/.test(line) || /^CertUtil: -hashfile command completed successfully\.\s*$/i.test(line)) continue;
@@ -2588,7 +2593,7 @@
             continue;
           }
           // CertUtil 的标签与文件名在摘要的上一行。
-          const cert = line.match(/^([a-z][\w/-]*) hash of (?:file )?(.+):\s*$/i);
+          const cert = line.match(/^([a-z][\w/-]*) hash of (?:file )?([\s\S]+):\s*$/i);
           const record = cert ? {tag: cert[1], content: '', ...checksumFile(cert[2])} : splitChecksumLine(line);
           if (cert && i + 1 < rows.length && rows[i + 1].length <= MAX_LINE_LENGTH && hexValue(normalizeDigest(rows[i + 1]))) {
             record.content = rows[++i];

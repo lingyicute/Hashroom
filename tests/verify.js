@@ -403,6 +403,15 @@ async function main() {
     assert.strictEqual(entriesForFile(parsed.entries, 'elsewhere').entries.length, 0);
   }
   assert.strictEqual(parseExpected(`\\${sha256}  bad\\q.iso`).invalid, true);
+  for (const file of ['win\\unix', 'line\u2028separator', 'para\u2029separator']) {
+    const lines = [`SHA2-256(${file})= ${sha256}`];
+    if (!file.includes('\\')) lines.push(`${sha256}  ${file}`);
+    for (const line of lines) {
+      const parsed = parseExpected(line);
+      assert.deepStrictEqual(parsed.entries.map(entry => entry.file), [file]);
+      assert.strictEqual(entriesForFile(parsed.entries, file).entries.length, 1);
+    }
+  }
   assert.strictEqual(parseExpected('cbf43926  cafe  edition.iso').entries[0].file, 'cafe  edition.iso');
   // 网页上复制来的哈希可能用不换行空格、全角空格分组或夹带零宽字符；文件名可能是 NFD 形式。
   for (const space of ['\u00a0', '\u3000', '\u202f']) {
@@ -410,7 +419,7 @@ async function main() {
     assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex]), [['SHA-256', sha256]], JSON.stringify(space));
   }
   assert.strictEqual(parseExpected(`\u200b${sha256.slice(0, 32)}\u200b${sha256.slice(32)}  a.iso`).entries[0].hex, sha256);
-  const composed = parseExpected(`${sha256}  caf\u00e9.iso\u2028d41d8cd98f00b204e9800998ecf8427e  other.iso`);
+  const composed = parseExpected(`${sha256}  caf\u00e9.iso\nd41d8cd98f00b204e9800998ecf8427e  other.iso`);
   assert.strictEqual(composed.entries.length, 2);
   assert.strictEqual(entriesForFile(composed.entries, 'cafe\u0301.iso').entries.length, 1);
   // Base64 摘要：SRI、带算法名的行，含无填充、URL 安全字母表及以连字符开头的 Base64url。
