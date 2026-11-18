@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-EjQAYQ9cPoUc9Prd/eByrf6zlaaZDQEB1fA7XaxLn4I='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-gjvo1mKuon33Z2rZZkkJP8Qwi7ljCaNe4XZGEkXLnZI='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2517,9 +2517,11 @@
       const text = escaped ? line.slice(1) : line;
       const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\(([\s\S]*)\)\s*=\s*([\s\S]*)$/);
       if (bsd) return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
-      // POSIX cksum 输出十进制校验和和文件大小，用的并不是这里的 CRC32。
-      const posix = !escaped && text.match(/^(\d{1,10}) \d+ ([\s\S]+)$/);
-      if (posix && !hexValue(text)) return {tag: 'POSIX cksum', content: posix[1], ...checksumFile(posix[2])};
+      // POSIX cksum 的十进制校验和、大小和可选文件名即使恰好都是十六进制字符，也不能按本工具的摘要比对。
+      const posix = !escaped && text.match(/^(0|[1-9]\d{0,9}) (?:0|[1-9]\d*)(?: ([\s\S]*))?$/);
+      if (posix && Number(posix[1]) <= 0xffffffff) {
+        return {tag: 'POSIX cksum', content: posix[1], ...(posix[2] ? checksumFile(posix[2]) : {})};
+      }
       const prefixed = text.match(/^([a-z][\w/-]*)[ \t]+([\s\S]*)$/i);
       const tag = prefixed && (/sum$/i.test(prefixed[1]) || findAlgorithmNames(prefixed[1]).length ||
         findAlgorithmNames(prefixed[1], UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;

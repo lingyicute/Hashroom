@@ -509,7 +509,9 @@ async function main() {
     'CRC32C: cbf43926',
     `SHAKE-128-256: ${sha256}`,
     `GOST256: ${sha256}`,
-    '12345678 42 ./sample.zip'
+    '12345678 42 ./sample.zip',
+    `12345678 42 ${'a'.repeat(22)}`, // 文件名全为十六进制字符、拼接后正好有 32 位。
+    '1234 5678' // 从标准输入计算时没有文件名。
   ]) {
     const foreign = parseExpected(line);
     assert.strictEqual(foreign.invalid, true, line);
