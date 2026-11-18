@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-eygb2f+PBXvmz+rnKFIJuuZRFnljpJ+uyAG+gldX04o='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-WsodR/MTcnFYxmCCE+UNSFrYfYOyQCZ3+7gpXu2p3pw='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2928,7 +2928,8 @@
     // 大文件算到一半时误关标签页或刷新会前功尽弃，计算期间让浏览器先确认一下。
     function confirmLeave(event) {
       event.preventDefault();
-      event.returnValue = '';
+      // 旧版浏览器还需要 truthy 的 returnValue；是否弹窗由浏览器决定。
+      event.returnValue = true;
     }
 
     function renderMessage(title, description, kind = 'empty', progress = 0) {

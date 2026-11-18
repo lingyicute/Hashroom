@@ -101,7 +101,15 @@ async function cancellation(page, url) {
   assert.equal(await page.getByRole('progressbar', {name: '摘要计算进度'}).getAttribute('aria-valuenow'), '0');
   assert.ok(await page.locator('#computeIcon').isHidden());
   assert.ok(await page.locator('#buttonSpinner').isVisible());
+  const leaveFlags = () => page.evaluate(() => {
+    const event = new Event('beforeunload', {cancelable: true});
+    Object.defineProperty(event, 'returnValue', {value: '', writable: true});
+    window.dispatchEvent(event);
+    return [event.defaultPrevented, Boolean(event.returnValue)];
+  });
+  assert.deepEqual(await leaveFlags(), [true, true]);
   await page.getByRole('button', {name: '取消计算'}).click();
+  assert.deepEqual(await leaveFlags(), [false, false]);
   assert.match(await page.locator('#statusLine').textContent(), /已取消/);
   assert.ok(await page.locator('#computeIcon').isVisible());
   assert.ok(await page.locator('#buttonSpinner').isHidden());
