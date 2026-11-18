@@ -129,6 +129,18 @@ function checkComparison() {
   const sha3 = {algorithm: 'SHA3-256', hex: expected('SHA3-256', Buffer.from('abc'))};
   const sha512t = {algorithm: 'SHA-512/256', hex: expected('SHA-512/256', Buffer.from('abc'))};
   const wrong = '1'.repeat(64);
+  // 页面复制的「算法: 摘要」必须能原样粘回去，不变成路径或同长度的其他算法。
+  for (const {id} of ALGORITHMS) {
+    const hex = expected(id, Buffer.from('abc'));
+    const parsed = parseExpected(`${id}: ${hex}`);
+    assert.deepStrictEqual(parsed.entries, [{algorithm: id, hex, file: ''}], id);
+    assert.deepStrictEqual(parsed.files, [], id);
+    assert.deepStrictEqual([...compareDigests(parsed.entries, [{algorithm: id, hex}], enabled).matched], [id]);
+  }
+  const tagged = parseExpected(`SHA-512/256: ${sha256.hex}`);
+  assert.deepStrictEqual([...compareDigests(tagged.entries, [sha256], enabled).needed], ['SHA-512/256']);
+  assert.deepStrictEqual(parseExpected(`SHA-512/192: ${sha256.hex}`).unsupported, ['SHA-512/192']);
+  assert.deepStrictEqual(parseExpected(`release/256: ${sha256.hex}`).entries.map(entry => entry.path), ['release/256']);
   const check = (text, results, supported = enabled) => compareDigests(parseExpected(text).entries, results, supported);
   const pending = check(sha3.hex, [sha256]);
   assert.deepStrictEqual([...pending.needed], ['SHA-512/256', 'SHA3-256']);

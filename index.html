@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-EJ8361zf5aUstXPjmHlSoMABAXDFZF8+H6dkIWPopsE='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-vfqVf+gcLkbE6EU15/RzeEyp3eiGsTXJCXiAJD4l4cQ='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2548,7 +2548,9 @@
         return {tag, content: spaced[1], ...checksumFile(spaced[2])};
       }
       const prefixFile = text.match(/^([\s\S]+?)[:：][ \t]+([\s\S]+)$/);
-      if (prefixFile && !/\s[/\\]\s/.test(prefixFile[1]) && /[.\/\\]/.test(prefixFile[1])) {
+      // SHA-512/224、SHA-512/256 的斜杠属于算法名，不是文件路径。
+      const slashLabel = prefixFile && /^(?:--)?sha[-_]?(?:2[-_]?)?512\/\d+$/i.test(prefixFile[1].trim());
+      if (prefixFile && !slashLabel && !/\s[/\\]\s/.test(prefixFile[1]) && /[.\/\\]/.test(prefixFile[1])) {
         return {content: prefixFile[2], ...checksumFile(prefixFile[1])};
       }
       return {content: line};
