@@ -294,7 +294,7 @@ async function main() {
   fallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile fallback ${item.algorithm}`));
   // 一次性读取没有报错、却只读到一部分时，同样不能算出截断数据的摘要，应退回流式处理。
   const shortFirstRead = new Blob([buf]);
-  shortFirstRead.arrayBuffer = () => Promise.resolve(buf.subarray(0, 1048576));
+  shortFirstRead.arrayBuffer = () => Promise.resolve(buf.slice(0, 1048576).buffer.slice(buf.byteOffset, buf.byteOffset + 1048576));
   const shortFallback = await hashFile(shortFirstRead, ['SHA-256', 'MD5'], freshSignal(), () => {});
   shortFallback.forEach(item => assert.strictEqual(item.hex, expected(item.algorithm, buf), `hashFile short-read fallback ${item.algorithm}`));
   // 没有 Blob.arrayBuffer() 的旧浏览器应通过 FileReader 读取，结果保持一致。
@@ -349,6 +349,15 @@ async function main() {
   await assert.rejects(hashFile(gone, ['MD5'], freshSignal(), () => {}), /file was removed/);
   const changedEmpty = {size: 0, arrayBuffer: async () => new ArrayBuffer(1)};
   await assert.rejects(hashFile(changedEmpty, ['MD5'], freshSignal(), () => {}), /Unexpected file read length/);
+  for (const value of [null, 0, new Uint8Array(0)]) {
+    for (const algorithm of ['MD5', 'SHA-256']) {
+      const unread = {size: 0, arrayBuffer: async () => value};
+      await assert.rejects(hashFile(unread, [algorithm], freshSignal(), () => {}), /Invalid file read buffer/);
+    }
+  }
+  const invalidNative = loadHashroom({digest: async () => 32});
+  assert.deepStrictEqual(await invalidNative.hashFile(new Blob(['abc']), ['SHA-256'], freshSignal(), () => {}),
+    [{algorithm: 'SHA-256', hex: expected('SHA-256', Buffer.from('abc'))}]);
   console.log('ok    hashFile');
   await checkCancellation();
   await checkLargeStream();

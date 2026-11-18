@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-dPOyYuEukLbawQWHrDlOV5k/iwq5IEpQGNeJ3AcEKYw='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-Buf/1s5UeRG3UGRTaUaMZ94WJhCevfDL5/X3gSQ9+Wo='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -3204,10 +3204,9 @@
     }
 
     // 浏览器用 FileReader 读取，取消时能中止正在读的分块或整文件，而不只是丢掉结果。
-    function readBlob(blob, signal) {
-      if (signal.aborted) return Promise.reject(readAbortError());
-      if (typeof FileReader !== 'function') return blob.arrayBuffer();
-      return new Promise((resolve, reject) => {
+    async function readBlob(blob, signal) {
+      if (signal.aborted) throw readAbortError();
+      const pending = typeof FileReader !== 'function' ? blob.arrayBuffer() : new Promise((resolve, reject) => {
         const reader = new FileReader();
         const finish = (settle, value) => {
           signal.removeEventListener('abort', abort);
@@ -3228,6 +3227,10 @@
           finish(reject, error);
         }
       });
+      const buffer = await pending;
+      // Uint8Array 会把 null 和某些无效值当成零长度或全零数据，不能先转换再校验。
+      if (!(buffer instanceof ArrayBuffer)) throw new Error('Invalid file read buffer');
+      return buffer;
     }
 
     const HASH_STEP = 256 * 1024;
@@ -3246,8 +3249,10 @@
         let hex = '';
         if (WEB_CRYPTO.has(id)) {
           try {
-            const digest = new Uint8Array(await subtle.digest(id, bytes));
-            if (digest.length === ALGORITHMS.find(item => item.id === id).bits / 8) hex = bytesToHex(digest);
+            const digest = await subtle.digest(id, bytes);
+            if (digest instanceof ArrayBuffer && digest.byteLength === ALGORITHMS.find(item => item.id === id).bits / 8) {
+              hex = bytesToHex(new Uint8Array(digest));
+            }
             lastYield = performance.now();
           } catch (error) {
             // 原生计算失败，仍用已读取的字节走纯 JS 路径。
