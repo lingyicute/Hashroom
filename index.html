@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-vfqVf+gcLkbE6EU15/RzeEyp3eiGsTXJCXiAJD4l4cQ='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-EjQAYQ9cPoUc9Prd/eByrf6zlaaZDQEB1fA7XaxLn4I='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2520,26 +2520,32 @@
       // POSIX cksum 输出十进制校验和和文件大小，用的并不是这里的 CRC32。
       const posix = !escaped && text.match(/^(\d{1,10}) \d+ ([\s\S]+)$/);
       if (posix && !hexValue(text)) return {tag: 'POSIX cksum', content: posix[1], ...checksumFile(posix[2])};
+      const prefixed = text.match(/^([a-z][\w/-]*)[ \t]+([\s\S]*)$/i);
+      const tag = prefixed && (/sum$/i.test(prefixed[1]) || findAlgorithmNames(prefixed[1]).length ||
+        findAlgorithmNames(prefixed[1], UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;
+      const payload = tag ? prefixed[2] : text;
+      const looksLikeHex = value => /^(?:0x)?[0-9a-f]+$/i.test(normalizeDigest(value));
+      const looksLikeDigest = value => looksLikeHex(value) || (tag && /^[A-Za-z0-9+/_-]+=*$/.test(value));
+      const sum = payload.match(/^(\S+)( [ *])([\s\S]+)$/);
+      if (sum && looksLikeDigest(sum[1])) {
+        // 优先使用 GNU 的固定标记；只在整行像分组摘要时才考虑合并短的前导组。
+        // 完整的短摘要之后只有一个十六进制词时，那个词仍可能是 GNU 文件名。
+        const joined = !escaped && sum[2] === '  ' && sum[1].length <= 16 && hexValue(normalizeDigest(payload));
+        const isGrouped = joined && (tag ? labelledField(tag, joined).hex :
+          HASH_LENGTHS.has(joined.length) && (!HASH_LENGTHS.has(hexValue(normalizeDigest(sum[1])).length) || /\S[ \t]+\S/.test(sum[3])));
+        if (!isGrouped) {
+          // PowerShell 的列宽填充不属于绝对路径；GNU 标记后的文件名则必须原样保留。
+          const tablePath = !escaped && tag && !/sum$/i.test(tag) && WINDOWS_PATH.test(sum[3].trimStart());
+          const name = tablePath ? sum[3].trimStart() : sum[3];
+          return {tag, content: sum[1], ...checksumFile(name, escaped)};
+        }
+      }
       // 前缀必须以十六进制字符结束，避免末尾大量空格被两段正则反复分配。
       const grouped = text.match(/^([0-9a-fx:：,，_\t \-]*[0-9a-f])[ \t]{2,}(\S[\s\S]*)$/i);
       if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2])) {
         const hex = hexValue(grouped[1]);
         const groups = grouped[1].trim().split(/[\t :：,，_\-]+/);
         if (hex && (HASH_LENGTHS.has(hex.length) || groups.length > 2)) return {content: grouped[1], ...checksumFile(grouped[2])};
-      }
-      const prefixed = text.match(/^([a-z][\w/-]*)[ \t]+([\s\S]*)$/i);
-      const tag = prefixed && (/sum$/i.test(prefixed[1]) || findAlgorithmNames(prefixed[1]).length ||
-        findAlgorithmNames(prefixed[1], UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;
-      const payload = tag ? prefixed[2] : text;
-      const looksLikeDigest = value => /^[0-9a-f]{8,128}$/i.test(normalizeDigest(value)) ||
-        (tag && /^[A-Za-z0-9+/_-]+=*$/.test(value));
-      const sum = payload.match(/^(\S+)( [ *])([\s\S]+)$/);
-      if (sum && looksLikeDigest(sum[1]) &&
-          (escaped || sum[2] !== '  ' || sum[1].length > 16 || !hexValue(normalizeDigest(`${sum[1]} ${sum[3]}`)))) {
-        // PowerShell 的列宽填充不属于绝对路径；GNU 清单的两个分隔字符之后则必须原样保留。
-        const tablePath = !escaped && tag && !/sum$/i.test(tag) && WINDOWS_PATH.test(sum[3].trimStart());
-        const name = tablePath ? sum[3].trimStart() : sum[3];
-        return {tag, content: sum[1], ...checksumFile(name, escaped)};
       }
       if (escaped) return {invalidFile: true};
       // 表格或手写的清单也可能只用一个空格或制表符分隔；不能把下一组十六进制当作文件名。

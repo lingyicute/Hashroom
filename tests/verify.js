@@ -430,7 +430,15 @@ async function main() {
       assert.strictEqual(entriesForFile(parsed.entries, file).entries.length, 1);
     }
   }
-  assert.strictEqual(parseExpected('cbf43926  cafe  edition.iso').entries[0].file, 'cafe  edition.iso');
+  for (const file of ['cafe  edition.iso', 'cafe beef  edition.iso', 'a'.repeat(24), '   padded.txt']) {
+    const parsed = parseExpected(`cbf43926  ${file}`);
+    assert.deepStrictEqual(parsed.entries, [{algorithm: null, hex: 'cbf43926', file, path: file}]);
+    assert.deepStrictEqual(entriesForFile(parsed.entries, 'other.txt', parsed.files).entries, []);
+  }
+  const brokenManifest = parseExpected(`${sha256}  a/same.iso\nfffffff  b/same.iso`);
+  assert.strictEqual(brokenManifest.invalidLines, 1);
+  assert.deepStrictEqual(brokenManifest.files.map(entry => entry.path), ['a/same.iso', 'b/same.iso']);
+  assert.strictEqual(entriesForFile(brokenManifest.entries, 'same.iso', brokenManifest.files).issue, 'ambiguous');
   // 网页上复制来的哈希可能用不换行空格、全角空格分组或夹带零宽字符；文件名可能是 NFD 形式。
   for (const space of ['\u00a0', '\u3000', '\u202f']) {
     const parsed = parseExpected(`SHA-256:${space}${sha256.match(/.{8}/g).join(space)}`);
