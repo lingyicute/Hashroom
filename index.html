@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-iQcfr9uPM/dRItLg1NOpSCoMBpts2SWIcF3xWXg3A4o='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-hTCC5n0BVdcC00yVO9eGos7cycNv3GQCtBCf7PI+dsQ='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2567,12 +2567,12 @@
           return {tag, content: sum[1], ...checksumFile(name, escaped)};
         }
       }
-      // 首个双字符分隔符之后是文件名；不要把文件名开头的十六进制词吞进摘要。
-      const grouped = text.match(/^([0-9a-fx:：,，_\t \-]*?[0-9a-f])[ \t]{2}([\s\S]+)$/i);
+      // 首个双字符分隔符之后是文件名；不要把文件名开头的十六进制词吞进摘要。带算法标签时分组摘要在标签之后。
+      const grouped = payload.match(/^([0-9a-fx:：,，_\t \-]*?[0-9a-f])[ \t]{2}([\s\S]+)$/i);
       if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2])) {
         const hex = hexValue(grouped[1]);
         const groups = grouped[1].trim().split(/[\t :：,，_\-]+/);
-        if (hex && (HASH_LENGTHS.has(hex.length) || groups.length > 2)) return {content: grouped[1], ...checksumFile(grouped[2])};
+        if (hex && (HASH_LENGTHS.has(hex.length) || groups.length > 2)) return {tag, content: grouped[1], ...checksumFile(grouped[2])};
       }
       if (escaped) return {invalidFile: true};
       // 表格或手写的清单也可能只用一个空格或制表符分隔；不能把下一组十六进制当作文件名。
