@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-8lUbpc+vVIyfK13ImWv1FOli8FAqniTL3pN64ssMSLI='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-DItmYQjuwDKT93I88ghbQB/M0VAEYos97LS7hFBbAYs='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2445,15 +2445,16 @@
       return {algorithm, strayLength: hex.length};
     }
 
-    function labelledField(label, value, tagged = false) {
+    function labelledField(label, value) {
       label = label.replace(/^--/, '');
       const names = [...new Set(findAlgorithmNames(label).map(canonicalAlgorithm))];
       const foreign = findAlgorithmNames(label, UNSUPPORTED_PATTERN).find(name => !names.length || /^hmac/i.test(name));
       if (foreign) return {unsupported: foreign};
       if (names.length > 1) return {};
       const result = digestField(value, names[0]);
+      // Hash、Checksum 这类中性词不是算法名；即使出现在 BSD 标记或 xxsum 前缀的位置，也只按长度推断。
       const neutral = /^(?:(?:hash|digest|checksum)(?: value)?|(?:哈希|散列|摘要)(?:值)?|校验[和值])$/i.test(label);
-      if (!names.length && (tagged || !neutral)) return result.hex ? {unsupported: label.slice(0, 80)} : {};
+      if (!names.length && !neutral) return result.hex ? {unsupported: label.slice(0, 80)} : {};
       return result;
     }
 
@@ -2489,7 +2490,7 @@
     }
 
     function parseDigestLine(content, tag) {
-      if (tag) return [labelledField(tag, content, true)];
+      if (tag) return [labelledField(tag, content)];
       if (hexValue(content)) return [digestField(content)];
       const tokens = content.trim().split(/\s+/);
       if (tokens.length <= MAX_NAMES_PER_LINE) {

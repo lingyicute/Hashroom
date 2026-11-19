@@ -561,6 +561,12 @@ async function main() {
   assert.strictEqual(parseExpected(`b3sum.txt: ${sha256}`).entries.length, 1);
   assert.strictEqual(parseExpected(`hmac-sha256-notes.txt: ${sha256}`).entries.length, 1);
   assert.strictEqual(parseExpected(`SHA256 (hmac.c) = ${sha256}`).entries[0].algorithm, 'SHA-256');
+  // Hash、Checksum 这类中性词出现在 BSD 标记或 xxsum 前缀的位置时，同样只按长度推断，不算不支持的算法。
+  for (const line of [`Checksum ${sha256}  file.txt`, `Hash (file.txt) = ${sha256}`, `checksum ${sha256} *file.txt`]) {
+    const parsed = parseExpected(line);
+    assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex, entry.file]), [[null, sha256, 'file.txt']], line);
+    assert.deepStrictEqual(parsed.unsupported, [], line);
+  }
   assert.strictEqual(parseExpected(`BLAKE2b / SHA-512: ${sha256}${sha256}`).entries[0].algorithm, 'SHA-512');
   for (const sample of [`SHA-256: ${sha256.slice(1)}`, `SHA-256: ${spaced.slice(0, -1)}`, `SHA-256: ${spaced.slice(1)}`]) {
     const truncated = parseExpected(sample);
