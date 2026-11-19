@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-hTCC5n0BVdcC00yVO9eGos7cycNv3GQCtBCf7PI+dsQ='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-V/Z110wpSR48vjwvUp+2A2HtQ1nxlaY4EvMJubM/PiQ='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2604,6 +2604,11 @@
       if (!matches.length) {
         const name = fileName.normalize('NFC');
         matches = named.filter(record => record.file.normalize('NFC') === name);
+      }
+      if (!matches.length) {
+        // 从网页或文档粘贴的校验行常带着行尾空格；精确和 NFC 都对不上时，再忽略文件名首尾空白比一次。
+        const name = fileName.normalize('NFC').trim();
+        matches = named.filter(record => record.file.normalize('NFC').trim() === name);
       }
       const paths = new Set(matches.map(record => record.path));
       const [path] = paths;

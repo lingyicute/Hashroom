@@ -610,6 +610,16 @@ async function main() {
   const normalized = parseExpected(`${sha256}  café.iso\n${'f'.repeat(64)}  cafe\u0301.iso`);
   assert.strictEqual(entriesForFile(normalized.entries, 'café.iso').entries[0].hex, sha256);
   assert.strictEqual(entriesForFile(normalized.entries, 'cafe\u0301.iso').entries[0].hex, 'f'.repeat(64));
+  // 粘贴的校验行常带行尾空格或多余的前导空格；只有精确和 NFC 都对不上时才忽略首尾空白，精确匹配仍然优先。
+  for (const line of [`${sha256}  ubuntu.iso `, `${sha256}  ubuntu.iso\t`, `${sha256}   ubuntu.iso`, `${sha256} LICENSE `]) {
+    const padded = parseExpected(line);
+    const scopedPadded = entriesForFile(padded.entries, line.includes('LICENSE') ? 'LICENSE' : 'ubuntu.iso', padded.files);
+    assert.strictEqual(scopedPadded.issue, null, line);
+    assert.strictEqual(scopedPadded.entries.length, 1, line);
+  }
+  const exactFirst = parseExpected(`${sha256}  ubuntu.iso \n${'f'.repeat(64)}  ubuntu.iso`);
+  assert.deepStrictEqual(entriesForFile(exactFirst.entries, 'ubuntu.iso', exactFirst.files).entries.map(entry => entry.hex), ['f'.repeat(64)]);
+  assert.strictEqual(entriesForFile(exactFirst.entries, 'ubuntu.iso ', exactFirst.files).entries[0].hex, sha256);
   const unusable = parseExpected(`SHA256 (a.iso) = ${sha256.slice(1)}\n${sha256}  b.iso`);
   assert.strictEqual(entriesForFile(unusable.entries, 'a.iso', unusable.files).issue, 'unusable');
   const base64 = parseExpected(`sha256sum ${Buffer.from(sha256, 'hex').toString('base64')} *other.iso`);
