@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-DItmYQjuwDKT93I88ghbQB/M0VAEYos97LS7hFBbAYs='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-iQcfr9uPM/dRItLg1NOpSCoMBpts2SWIcF3xWXg3A4o='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2545,7 +2545,8 @@
       if (posix && Number(posix[1]) <= 0xffffffff) {
         return {tag: 'POSIX cksum', content: posix[1], ...(posix[2] ? checksumFile(posix[2]) : {})};
       }
-      const prefixed = text.match(/^([a-z][\w/-]*)[ \t]+([\s\S]*)$/i);
+      // 算法名后面可以带冒号再接摘要和文件名，如 `SHA256: 摘要  文件`。
+      const prefixed = text.match(/^([a-z][\w/-]*)(?:[:：][ \t]*|[ \t]+)([\s\S]*)$/i);
       const tag = prefixed && (/sum$/i.test(prefixed[1]) || findAlgorithmNames(prefixed[1]).length ||
         findAlgorithmNames(prefixed[1], UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;
       const payload = tag ? prefixed[2] : text;
