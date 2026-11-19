@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-Ah0jqK1GAt9TJDq8gctGjuZVq2rM3/8Ut0cWSuSI+aY='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-8lUbpc+vVIyfK13ImWv1FOli8FAqniTL3pN64ssMSLI='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2526,6 +2526,8 @@
         // 只在明显是 Windows 路径时把 \ 当分隔符。POSIX 上未转义的反斜杠也可能是文件名的一部分。
         name = name.replace(/\\/g, '/');
       }
+      // coreutils 的 - 和 OpenSSL 的 (stdin) 表示从标准输入计算，不是文件名，按未注明文件名处理。
+      if (name === '-' || name === 'stdin') return {file: '', path: '', invalidFile: false};
       const path = name.replace(/^(?:\.\/)+/, '');
       const file = path.slice(path.lastIndexOf('/') + 1);
       return {file, path, invalidFile: invalidFile || !file};
@@ -2534,7 +2536,8 @@
     function splitChecksumLine(line, allowPosix = true) {
       const escaped = line.startsWith('\\');
       const text = escaped ? line.slice(1) : line;
-      const bsd = text.match(/^([A-Za-z][\w/-]*)\s*\(([\s\S]*)\)\s*=\s*([\s\S]*)$/);
+      // OpenSSL 1.x 从标准输入计算时不打印算法名，只有 (stdin)= 摘要。
+      const bsd = text.match(/^([A-Za-z][\w/-]*)?\s*\(([\s\S]*)\)\s*=\s*([\s\S]*)$/);
       if (bsd) return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
       // POSIX cksum 的十进制校验和、大小和可选文件名即使恰好都是十六进制字符，也不能按本工具的摘要比对。
       const posix = allowPosix && !escaped && text.match(/^(0|[1-9]\d{0,9}) (?:0|[1-9]\d*)(?: ([\s\S]*))?$/);

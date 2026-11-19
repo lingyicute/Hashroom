@@ -616,6 +616,16 @@ async function main() {
   assert.deepStrictEqual(parseExpected(`${sha256} LICENSE`).entries.map(entry => entry.file), ['LICENSE']);
   assert.deepStrictEqual(parseExpected(`sha256sum ${sha256}\t说明`).entries.map(entry => [entry.algorithm, entry.file]), [['SHA-256', '说明']]);
   assert.strictEqual(parseExpected(`${sha256} *`).invalid, true); // 不是名为 * 的单空格条目。
+  // 从标准输入计算时 coreutils 打印 -，OpenSSL 打印 (stdin)：都不是文件名，应当比对当前文件。
+  for (const line of [`${sha256}  -`, `${sha256} *-`, `${sha256} -`, `\\${sha256}  -`, `SHA2-256(stdin)= ${sha256}`, `(stdin)= ${sha256}`, `SHA256 (stdin) = ${sha256}`]) {
+    const parsed = parseExpected(line);
+    assert.deepStrictEqual(parsed.entries.map(entry => [entry.hex, entry.file]), [[sha256, '']], line);
+    assert.deepStrictEqual(parsed.files, [], line);
+    assert.strictEqual(parsed.invalid, false, line);
+    assert.strictEqual(entriesForFile(parsed.entries, 'download.iso', parsed.files).entries.length, 1, line);
+  }
+  assert.strictEqual(parseExpected(`SHA2-256(stdin)= ${sha256}`).entries[0].algorithm, 'SHA-256');
+  assert.strictEqual(parseExpected(`${sha256}  ./-`).entries[0].file, '-'); // 明确写成路径的才是文件名。
   assert.strictEqual(parseExpected(`SHA-256 ${sha256} / ${sha256}`).invalid, true);
   // 分隔符后是另一段十六进制（分组哈希的后续片段）时不能当成文件名。
   assert.deepStrictEqual(parseExpected(`${sha256.slice(0, 32)} ${sha256.slice(32)}`).entries, [{algorithm: null, hex: sha256, file: ''}]);
