@@ -662,11 +662,20 @@ async function main() {
     assert.strictEqual(parsed.invalid, false, line);
   }
   assert.strictEqual(parseExpected(`SHA256: ${sha256.slice(0, 56)}  release.iso`).malformed.strayLength, 56);
-  // 带算法标签的分组摘要后面也可以跟文件名，不能只取第一组当摘要。
-  for (const line of [`sha256sum ${spaced}  release.iso`, `SHA256: ${spaced}  release.iso`, `SHA-256: ${sha256.match(/.{4}/g).join(':')}  release.iso`]) {
+  // 带算法标签的分组摘要后面也可以跟文件名，不能只取第一组当摘要；无扩展名和单空格分隔同样识别。
+  for (const [line, algorithm, file] of [
+    [`sha256sum ${spaced}  release.iso`, 'SHA-256', 'release.iso'],
+    [`SHA256: ${spaced}  release.iso`, 'SHA-256', 'release.iso'],
+    [`SHA-256: ${sha256.match(/.{4}/g).join(':')}  release.iso`, 'SHA-256', 'release.iso'],
+    [`${spaced}  LICENSE`, null, 'LICENSE'],
+    [`sha256sum ${spaced}  说明`, 'SHA-256', '说明'],
+    [`SHA-256: ${spaced} release.iso`, 'SHA-256', 'release.iso'],
+    [`${spaced} LICENSE`, null, 'LICENSE']
+  ]) {
     const parsed = parseExpected(line);
-    assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex, entry.file]), [['SHA-256', sha256, 'release.iso']], line);
+    assert.deepStrictEqual(parsed.entries.map(entry => [entry.algorithm, entry.hex, entry.file]), [[algorithm, sha256, file]], line);
   }
+  assert.strictEqual(parseExpected(`${spaced}  trailing garbage`).invalid, true);
   assert.strictEqual(parseExpected(`sha256sum ${spaced.slice(0, -1)}  release.iso`).malformed.strayLength, 63);
   // 从标准输入计算时 coreutils 打印 -，OpenSSL 打印 (stdin)：都不是文件名，应当比对当前文件。
   for (const line of [`${sha256}  -`, `${sha256} *-`, `${sha256} -`, `\\${sha256}  -`, `SHA2-256(stdin)= ${sha256}`, `(stdin)= ${sha256}`, `SHA256 (stdin) = ${sha256}`]) {

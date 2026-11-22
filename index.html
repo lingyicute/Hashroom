@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-Vd7JgoAsELYUtKvkRZyY3ejkYuNVND2at4hGiBYxjq0='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-G5Nk1t175YCUECnaUQL+08oxL7FcNImEC1oQxPsK7jI='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2576,9 +2576,20 @@
           return {tag, content: sum[1], ...checksumFile(name, escaped)};
         }
       }
+      const isPathLike = name => /[./\\]/.test(name) && !/^[./\\]+[ \t]/.test(name);
+      const isSingleName = name => {
+        const token = name.replace(/[ \t]+$/, '');
+        // 不猜无结构的多词注释，也不把连续十六进制组解释成文件名。
+        return /^[^\s*:=]+$/.test(token) && !hexValue(normalizeDigest(token));
+      };
+      const isValidDigest = value => {
+        const normalized = normalizeDigest(value);
+        return tag ? Boolean(labelledField(tag, normalized).hex) : HASH_LENGTHS.has(hexValue(normalized).length);
+      };
       // 首个双字符分隔符之后是文件名；不要把文件名开头的十六进制词吞进摘要。带算法标签时分组摘要在标签之后。
       const grouped = payload.match(/^([0-9a-fx:：,，_\t \-]*?[0-9a-f])[ \t]{2}([\s\S]+)$/i);
-      if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) && /[./\\]/.test(grouped[2])) {
+      if (!escaped && grouped && /^[0-9a-f]{2,16}[ \t:：,，_\-]/i.test(grouped[1]) &&
+        (isPathLike(grouped[2]) || (isSingleName(grouped[2]) && isValidDigest(grouped[1])))) {
         const hex = hexValue(grouped[1]);
         const groups = grouped[1].trim().split(/[\t :：,，_\-]+/);
         if (hex && (HASH_LENGTHS.has(hex.length) || groups.length > 2)) return {tag, content: grouped[1], ...checksumFile(grouped[2])};
@@ -2588,11 +2599,23 @@
       const spaced = payload.match(/^(\S+)[ \t]+(\S[\s\S]*)$/);
       if (spaced && looksLikeDigest(spaced[1])) {
         const [, value, name] = spaced;
-        const pathLike = /[./\\]/.test(name) && !/^[./\\]+[ \t]/.test(name);
-        const token = name.replace(/[ \t]+$/, '');
-        // 不猜无结构的多词注释，也不把连续十六进制组解释成文件名。
-        const singleName = /^[^\s*:=]+$/.test(token) && !hexValue(normalizeDigest(token));
-        if (pathLike || (singleName && (tag ? labelledField(tag, normalizeDigest(value)).hex : HASH_LENGTHS.has(hexValue(normalizeDigest(value)).length)))) {
+        if (value.length <= 16 && /^[0-9a-f]{2,16}[ \t]/i.test(name) && !hexValue(normalizeDigest(name))) {
+          let hex = hexValue(normalizeDigest(value));
+          let pos = value.length;
+          while (pos < payload.length && hex.length < 128) {
+            const next = payload.slice(pos).match(/^([ \t]+)([0-9a-f]{2,16})(?=[ \t]|$)/i);
+            if (!next) break;
+            pos += next[0].length;
+            hex += next[2].toLowerCase();
+            if (isValidDigest(hex)) {
+              const tail = payload.slice(pos).match(/^[ \t]+(\S[\s\S]*)$/);
+              if (tail && (isPathLike(tail[1]) || isSingleName(tail[1]))) {
+                return {tag, content: payload.slice(0, pos), ...checksumFile(tail[1])};
+              }
+            }
+          }
+        }
+        if (isPathLike(name) || (isSingleName(name) && isValidDigest(value))) {
           return {tag, content: value, ...checksumFile(name)};
         }
       }
