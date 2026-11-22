@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-V/Z110wpSR48vjwvUp+2A2HtQ1nxlaY4EvMJubM/PiQ='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-IDWl45i73WD8gAewU3dvuQoaina7g1R+9w+czCHSlTE='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2541,9 +2541,11 @@
     function splitChecksumLine(line, allowPosix = true) {
       const escaped = line.startsWith('\\');
       const text = escaped ? line.slice(1) : line;
-      // OpenSSL 1.x 从标准输入计算时不打印算法名，只有 (stdin)= 摘要。
+      // OpenSSL 1.x 从标准输入计算时不打印算法名，只有 (stdin)= 摘要；避免把十六进制摘要当成算法名。
       const bsd = text.match(/^([A-Za-z][\w/-]*)?\s*\(([\s\S]*)\)\s*=\s*([\s\S]*)$/);
-      if (bsd) return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
+      if (bsd && !(bsd[1] && /^[0-9a-f]{8,}$/i.test(bsd[1]))) {
+        return {tag: bsd[1], content: bsd[3], ...checksumFile(bsd[2], escaped)};
+      }
       // POSIX cksum 的十进制校验和、大小和可选文件名即使恰好都是十六进制字符，也不能按本工具的摘要比对。
       const posix = allowPosix && !escaped && text.match(/^(0|[1-9]\d{0,9}) (?:0|[1-9]\d*)(?: ([\s\S]*))?$/);
       if (posix && Number(posix[1]) <= 0xffffffff) {

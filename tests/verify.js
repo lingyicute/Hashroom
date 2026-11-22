@@ -456,6 +456,8 @@ async function main() {
     assert.deepStrictEqual(parsed.entries, [{algorithm: null, hex: 'cbf43926', file, path: file}]);
     assert.deepStrictEqual(entriesForFile(parsed.entries, 'other.txt', parsed.files).entries, []);
   }
+  const parenName = parseExpected(`${sha256}  (1) = 2.txt`);
+  assert.deepStrictEqual(parenName.entries, [{algorithm: null, hex: sha256, file: '(1) = 2.txt', path: '(1) = 2.txt'}]);
   const brokenManifest = parseExpected(`${sha256}  a/same.iso\nfffffff  b/same.iso`);
   assert.strictEqual(brokenManifest.invalidLines, 1);
   assert.deepStrictEqual(brokenManifest.files.map(entry => entry.path), ['a/same.iso', 'b/same.iso']);
