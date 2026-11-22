@@ -56,7 +56,7 @@ if (require.main === module) {
     const {match} = readPolicy(html);
     const sources = scriptSources(html);
     const updated = match[1].replace(/(^|;\s*)script-src\s+[^;]*/i, (_, prefix) => `${prefix}script-src ${sources}`);
-    writeFileSync(path, html.replace(match[0], match[0].replace(match[1], updated)));
+    writeFileSync(path, html.replace(match[0], () => match[0].replace(match[1], () => updated)));
   } else {
     checkScriptPolicy(html);
   }
