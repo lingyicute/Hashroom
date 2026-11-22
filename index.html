@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-IDWl45i73WD8gAewU3dvuQoaina7g1R+9w+czCHSlTE='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-PWUO35l+4Ra99evDqNaOg8UBTRIXbDPJSOKh8mL4G7A='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2535,7 +2535,7 @@
       if (name === '-' || name === 'stdin') return {file: '', path: '', invalidFile: false};
       const path = name.replace(/^(?:\.\/)+/, '');
       const file = path.slice(path.lastIndexOf('/') + 1);
-      return {file, path, invalidFile: invalidFile || !file};
+      return {file, path, invalidFile: invalidFile || !file.trim()};
     }
 
     function splitChecksumLine(line, allowPosix = true) {
@@ -2559,7 +2559,7 @@
       const looksLikeHex = value => /^(?:0x)?[0-9a-f]+$/i.test(normalizeDigest(value));
       const looksLikeDigest = value => looksLikeHex(value) || (tag && /^[A-Za-z0-9+/_-]+=*$/.test(value));
       const sum = payload.match(/^(\S+)( [ *])([\s\S]+)$/);
-      if (sum && looksLikeDigest(sum[1])) {
+      if (sum && looksLikeDigest(sum[1]) && (sum[2] === ' *' || /\S/.test(sum[3]))) {
         // 优先使用 GNU 的固定标记；只在整行像分组摘要时才考虑合并短的前导组。
         // 完整的短摘要之后只有一个十六进制词时，那个词仍可能是 GNU 文件名。
         const joined = !escaped && sum[2] === '  ' && sum[1].length <= 16 && hexValue(normalizeDigest(payload));

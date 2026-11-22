@@ -495,8 +495,15 @@ async function main() {
     `SHA-256: ${sha256} / ${sha256}`,
     `sha256-${sha256.slice(0, 56)}`,
     `UNKNOWN256 (file) = ${sha256}`,
-    `SHA256 () = ${sha256}`
+    `SHA256 () = ${sha256}`,
+    `SHA256 (   ) = ${sha256}`,
+    `${sha256} * `
   ]) assert.strictEqual(parseExpected(line).invalid, true, line);
+  for (const [line, algorithm] of [[`${sha256}   `, null], [`SHA256: ${sha256}   `, 'SHA-256'], [`sha256sum ${sha256}   `, 'SHA-256']]) {
+    const trailing = parseExpected(line);
+    assert.deepStrictEqual(trailing.entries, [{algorithm, hex: sha256, file: ''}], line);
+    assert.deepStrictEqual(trailing.files, [], line);
+  }
   const wrongLength = parseExpected(`SHA-256: ${sha256.slice(0, 56)}`);
   assert.deepStrictEqual(wrongLength.malformed, {algorithm: 'SHA-256', strayLength: 56});
   for (const separator of ['  ', '\t', ' , ', ' : ']) {
