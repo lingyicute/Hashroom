@@ -10,7 +10,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta http-equiv="Content-Security-Policy"
-    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-PWUO35l+4Ra99evDqNaOg8UBTRIXbDPJSOKh8mL4G7A='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
+    content="default-src 'none'; script-src 'sha256-iDnhUlyAE+38tXFfALFW8Qzn0vop6N//Oxs1fnhroPQ=' 'sha256-Vd7JgoAsELYUtKvkRZyY3ejkYuNVND2at4hGiBYxjq0='; style-src 'unsafe-inline'; img-src data:; base-uri 'none'; form-action 'none'">
   <meta name="referrer" content="no-referrer">
   <meta name="theme-color" content="#f7f5fa">
   <title>Hashroom 文件摘要小助手 by lingyicute</title>
@@ -2449,6 +2449,9 @@
       return {algorithm, strayLength: hex.length};
     }
 
+    // Hash、Checksum 这类中性词不是算法名；即使出现在标记位置，也只按长度推断。
+    const NEUTRAL_LABEL = /^(?:(?:hash|digest|checksum)(?: value)?|(?:哈希|散列|摘要)(?:值)?|校验[和值])$/i;
+
     function labelledField(label, value) {
       label = label.replace(/^--/, '');
       const names = [...new Set(findAlgorithmNames(label).map(canonicalAlgorithm))];
@@ -2456,8 +2459,7 @@
       if (foreign) return {unsupported: foreign};
       if (names.length > 1) return {};
       const result = digestField(value, names[0]);
-      // Hash、Checksum 这类中性词不是算法名；即使出现在 BSD 标记或 xxsum 前缀的位置，也只按长度推断。
-      const neutral = /^(?:(?:hash|digest|checksum)(?: value)?|(?:哈希|散列|摘要)(?:值)?|校验[和值])$/i.test(label);
+      const neutral = NEUTRAL_LABEL.test(label);
       if (!names.length && !neutral) return result.hex ? {unsupported: label.slice(0, 80)} : {};
       return result;
     }
@@ -2551,10 +2553,11 @@
       if (posix && Number(posix[1]) <= 0xffffffff) {
         return {tag: 'POSIX cksum', content: posix[1], ...(posix[2] ? checksumFile(posix[2]) : {})};
       }
-      // 算法名后面可以带冒号再接摘要和文件名，如 `SHA256: 摘要  文件`。
-      const prefixed = text.match(/^([a-z][\w/-]*)(?:[:：][ \t]*|[ \t]+)([\s\S]*)$/i);
-      const tag = prefixed && (/sum$/i.test(prefixed[1]) || findAlgorithmNames(prefixed[1]).length ||
-        findAlgorithmNames(prefixed[1], UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;
+      // 算法名后面可以带冒号或等号再接摘要和文件名，如 `SHA256: 摘要  文件`、`--sha256 摘要  文件`。
+      const prefixed = text.match(/^((?:--)?[a-z][\w/-]*)(?:[ \t]*[:=：][ \t]*|[ \t]+)([\s\S]+)$/i);
+      const label = prefixed && prefixed[1].replace(/^--/, '');
+      const tag = label && (/sum$/i.test(label) || NEUTRAL_LABEL.test(label) ||
+        findAlgorithmNames(label).length || findAlgorithmNames(label, UNSUPPORTED_PATTERN).length) ? prefixed[1] : undefined;
       const payload = tag ? prefixed[2] : text;
       const looksLikeHex = value => /^(?:0x)?[0-9a-f]+$/i.test(normalizeDigest(value));
       const looksLikeDigest = value => looksLikeHex(value) || (tag && /^[A-Za-z0-9+/_-]+=*$/.test(value));
