@@ -11,8 +11,12 @@ const privacyDirectives = new Map([
   ['base-uri', "'none'"], ['form-action', "'none'"]
 ]);
 
+const anyCspMeta = /<meta\b[^>]*\bhttp-equiv\s*=\s*(?:"content-security-policy"|'content-security-policy'|content-security-policy(?=[\s/>]))/gi;
+
 function readPolicy(html) {
+  const allPolicies = [...html.matchAll(anyCspMeta)];
   const policies = [...html.matchAll(policy)];
+  assert.equal(allPolicies.length, 1, '页面应有且仅有一个可检查的 CSP 元标签');
   assert.equal(policies.length, 1, '页面应有且仅有一个可检查的 CSP 元标签');
   const match = policies[0];
   const before = html.slice(0, match.index);

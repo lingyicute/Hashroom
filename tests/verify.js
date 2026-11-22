@@ -260,6 +260,8 @@ async function main() {
   assert.throws(() => checkScriptPolicy(src.replace("default-src 'none'", "default-src 'self'")), /本地处理限制/);
   assert.throws(() => checkScriptPolicy(src.replace("form-action 'none'", "form-action 'none'; connect-src 'self'")), /覆盖限制/);
   assert.throws(() => checkScriptPolicy(src.replace("default-src 'none'", "default-src 'none'; default-src 'self'")), /重复的 CSP 指令/);
+  assert.throws(() => checkScriptPolicy(src.replace('</head>', "<meta http-equiv='Content-Security-Policy' content=\"default-src 'none'\"></head>")), /CSP 元标签/);
+  assert.throws(() => checkScriptPolicy(src.replace('</head>', '<meta content="default-src \'none\'" http-equiv="Content-Security-Policy"></head>')), /CSP 元标签/);
   console.log('ok    CSP placement, restrictions and script hashes');
   checkBitLength();
   checkDurationFormat();
